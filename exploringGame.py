@@ -4,6 +4,7 @@ import time
 import os
 import worldgen
 
+
 screenWidth = 1300
 screenHeight = 700
 gameDisplay = pygame.display.set_mode((screenWidth, screenHeight))
@@ -11,16 +12,23 @@ gridSize = 64
 tiles = []
 
 def loadImage(textureName, size=gridSize):
-    image = pygame.image.load(os.path.join("textures", textureName))
+    name = os.path.join("textures", textureName)
+    image = pygame.image.load(name).convert_alpha()
     image = pygame.transform.scale(image, (size, size))
+
+    #img_surface = image
     #image = pygame.transform.flip(image, True, False)
-    return image
+    img_rect = image.get_rect()
+    img_surface = pygame.Surface((img_rect.width, img_rect.height), pygame.SRCALPHA)
+    img_surface.fill((0, 0, 0, 0))
+    img_surface.blit(image, img_rect)
+    return img_surface
 
 def collides(self, other):
         r = self.__class__.radius + other.__class__.radius
         dx = self.x-other.x
         dy = self.y-other.y
-        if abs(dx)<r and abs(dy)<r:
+        if dx*dx<r*r and dy*dy<r*r: #abs
             return True
         else:
             return False
@@ -47,13 +55,14 @@ class World():
             thing.update()
 
     def draw(self):
+        x,y = self.player.x, self.player.y
         for row in self.tiles:
             for tile in row:
-                tile.draw()
+                tile.draw(x, y)
         thingsToDraw = self.things + [self.player]
         thingsToDraw.sort(key=lambda x:x.y)
         for thing in thingsToDraw:
-            thing.draw()
+            thing.draw(x,y)
             
 
     def getTile(self, x, y):
@@ -113,9 +122,17 @@ class Tile():
         elif self.type == "snow" and random.random()<0.5:
             world.things.append(Stone(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
 
-    def draw(self):
-        if(abs(self.x-world.player.x)<screenWidth and abs(self.y-world.player.y)<screenHeight):
+    def draw(self, x,y):
+        
+        #pl = world.player
+        dx = (self.x-x)
+        dy = (self.y-y)
+        wdt = 1400
+        hgt = 800
+        
+        if(2*dx<wdt and 2*dy<hgt) and (2*-dx<wdt and 2*-dy<hgt):
             world.camera.drawImage(self.image, self.x, self.y)
+        
 
 class Camera():
 
@@ -146,10 +163,18 @@ class Thing():
         ground = world.getTile(self.x,self.y)
         if ground.type=="water":
             world.things.remove(self)
-            print("aj")
+            #print("aj")
 
-    def draw(self):
-        world.camera.drawImage(self.image, self.x-gridSize*self.size//2, self.y-gridSize*self.size)
+    def draw(self, x, y):
+        #pl = world.player
+        dx = (self.x-x)
+        dy = (self.y-y)
+        wdt = 1400
+        hgt = 800
+        
+        if(2*dx<wdt and 2*dy<hgt) and (2*-dx<wdt and 2*-dy<hgt):
+            world.camera.drawImage(self.image, self.x-gridSize*self.size//2, self.y-gridSize*self.size)
+
 class Stone(Thing):
     def __init__(self,x=0,y=0):
         super(Stone, self).__init__(x,y)
@@ -222,10 +247,10 @@ class Gremlin(Animal):
 
     def eat(self):
         closest = None
-        best = 100
+        best = 10000
         for thing in world.things:
             if thing.type=="tree":
-                dist = abs(self.x-thing.x)+abs(self.y-thing.y)
+                dist = (self.x-thing.x)**2+(self.y-thing.y)**2
                 if dist<best:
                     best = dist
                     closest = thing
@@ -293,7 +318,7 @@ class Player():
         world.things.append(self.holding)
         self.holding = None
 
-    def draw(self):
+    def draw(self, x, y): #becuase world sends these
         world.camera.drawImage(self.image, self.x-gridSize*self.size//2, self.y-gridSize*self.size)
         if self.holding:
             self.holding.x=self.x
@@ -301,12 +326,17 @@ class Player():
             self.holding.draw()
 
 
+
 world = World()
 world.generateWorld()
 
 
 clock = pygame.time.Clock()
-while not pygame.QUIT in [event.type for event in pygame.event.get()]:
+running = True
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
 
     # DO THINGS
     pressed = pygame.key.get_pressed()
@@ -317,8 +347,8 @@ while not pygame.QUIT in [event.type for event in pygame.event.get()]:
     gameDisplay.fill((25,25,105))
     world.draw()
 
-    pygame.display.update()
-    #print(clock.tick(20000))
+    pygame.display.flip()
+    (clock.tick(20000))
 
 
 pygame.quit()
