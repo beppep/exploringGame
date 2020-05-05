@@ -106,7 +106,7 @@ class World():
 
 class Tile():
 
-    types = ["grass","sand","water","lightWater","darkGrass","snow"]
+    types = ["grass","sand","water","lightWater","darkGrass","snow","ice"]
 
     images = {string:loadImage(string+".png") for string in types}
 
@@ -115,11 +115,13 @@ class Tile():
         self.y = y
         self.type = typee
         self.image=self.images[self.type]
+        if self.type == "grass" and random.random()<0.01:
+            world.things.append(Flower(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
         if self.type == "grass" and random.random()<0.2:
             world.things.append(Tree(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
         elif self.type == "darkGrass" and random.random()<0.5:
             world.things.append(Tree(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
-        elif self.type == "snow" and random.random()<0.5:
+        elif self.type == "snow" and random.random()<0.3:
             world.things.append(Stone(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
 
     def draw(self, x,y):
@@ -154,7 +156,19 @@ class Thing():
         self.x = x
         self.y = y
         self.size=1
+    def search(self,filter=lambda x:True,range=100):
+        closest = None
+        best = range
+        for thing in world.things:
+            if filter(thing) and thing != self:
+                dist = abs(self.x-thing.x)+abs(self.y-thing.y)
+                if dist<best:
+                    best = dist
+                    closest = thing
+        return closest
 
+    def use(self):
+        pass
     def setSize(self, size):
         self.size=size
         self.image = loadImage(self.type+".png",int(self.size*gridSize))
@@ -163,7 +177,6 @@ class Thing():
         ground = world.getTile(self.x,self.y)
         if ground.type=="water":
             world.things.remove(self)
-            #print("aj")
 
     def draw(self, x, y):
         #pl = world.player
@@ -181,6 +194,62 @@ class Stone(Thing):
         self.type="stone"
         self.setSize(1)
 
+class Flower(Thing):
+    def __init__(self,x=0,y=0):
+        super(Flower, self).__init__(x,y)
+        self.type="flower"
+        self.setSize(1)
+class IceFlower(Thing):
+    def __init__(self,x=0,y=0):
+        super(IceFlower, self).__init__(x,y)
+        self.type="iceflower"
+        self.setSize(1)
+
+class Hatchet(Thing):
+    def __init__(self,x=0,y=0):
+        super(Hatchet, self).__init__(x,y)
+        self.type="hatchet"
+        self.uses=5
+        self.setSize(1)
+    def use(self):
+        print(self.uses)
+        closest = self.search()
+        if closest:
+            self.uses-=1
+            if(closest.type=="tree"):
+                world.things.remove(closest)
+                logs=random.randint(1,2)
+                for i in range(logs):
+                    log=Log(x=closest.x+random.randrange(-32,32),y=closest.y+random.randrange(-32,32))
+                    log.setSize(closest.size/2)
+                    world.things.append(log)
+            elif(closest.type=="stone"):
+                world.things.remove(closest)
+                pebbles=random.randint(1,2)
+                for i in range(pebbles):
+                    pebble=Pebble(x=closest.x+random.randrange(-32,32),y=closest.y+random.randrange(-32,32))
+                    pebble.setSize(closest.size)
+                    world.things.append(pebble)
+                if(random.random()<0.2):
+                    ruby=Ruby(x=closest.x+random.randrange(-32,32),y=closest.y+random.randrange(-32,32))
+                    pebble.setSize(closest.size)
+                    world.things.append(ruby)
+            else:
+                self.uses+=1
+        if(self.uses<=0):
+            world.player.holding=None
+class Shovel(Thing):
+    def __init__(self,x=0,y=0):
+        super(Shovel, self).__init__(x,y)
+        self.type="shovel"
+        self.uses=10
+        self.setSize(1)
+    def use(self):
+        print(self.uses)
+        ground = world.getTile(self.x, self.y)
+        conversion = {"snow":"darkGrass","darkGrass":"grass","grass":"sand","sand":"lightWater","ice":"lightWater","water":"water","lightWater":"lightWater"}
+        ground.type = conversion[ground.type]
+        ground.image=ground.images[ground.type]
 class Tree(Thing):
 
     def __init__(self,x=0,y=0):
@@ -202,6 +271,21 @@ class Tree(Thing):
             self.setSize(self.size+0.001)
             if random.random()<0.01:
                 world.tiles[ground.y//gridSize][ground.x//gridSize]=Tile("sand",ground.x,ground.y)
+class Log(Thing):
+    def __init__(self,x=0,y=0):
+        super(Log, self).__init__(x,y)
+        self.type="log"
+        self.setSize(1)
+class Ruby(Thing):
+    def __init__(self,x=0,y=0):
+        super(Ruby, self).__init__(x,y)
+        self.type="ruby"
+        self.setSize(1)
+class Pebble(Thing):
+    def __init__(self,x=0,y=0):
+        super(Pebble, self).__init__(x,y)
+        self.type="pebble"
+        self.setSize(1)
 
 class Animal(Thing):
     def __init__(self, x=0, y=0):
@@ -246,14 +330,7 @@ class Gremlin(Animal):
             self.eat()
 
     def eat(self):
-        closest = None
-        best = 10000
-        for thing in world.things:
-            if thing.type=="tree":
-                dist = (self.x-thing.x)**2+(self.y-thing.y)**2
-                if dist<best:
-                    best = dist
-                    closest = thing
+        closest = self.search(filter=lambda x:x.type=="tree")
         if closest:
             world.things.remove(closest)
             stone=Stone(x=closest.x,y=closest.y)
@@ -263,7 +340,7 @@ class Gremlin(Animal):
 class Player():
 
     hp = 3
-    speed = 2
+    speed = 4
 
     idleImage = loadImage("idle.png")
 
@@ -274,14 +351,31 @@ class Player():
         self.image = Player.idleImage
         self.holding = None
         self.spaceDown = False
+        self.eDown = False
+    def search(self,filter=lambda x:True,range=100):
+        closest = None
+        best = range
+        for thing in world.things:
+            if filter(thing) and thing != self:
+                dist = abs(self.x-thing.x)+abs(self.y-thing.y)
+                if dist<best:
+                    best = dist
+                    closest = thing
+        return closest
 
     def move(self, pressed):
         speed = self.speed
-        ground = world.getTile(self.x, self.y).type
-        if ground=="water":
+        ground = world.getTile(self.x, self.y)
+        if ground.type=="water":
             speed*=0.25
-        if ground=="lightWater":
+        if ground.type=="lightWater":
             speed*=0.5
+            if(self.holding):
+                if(self.holding.type=="iceflower"):
+                    ground.type = "ice"
+                    ground.image=ground.images["ice"]
+        if ground.type=="ice":
+            speed*=2           
         if(pressed[pygame.K_d]):
             self.x+=speed
         if(pressed[pygame.K_a]):
@@ -290,6 +384,12 @@ class Player():
             self.y+=speed
         if(pressed[pygame.K_w]):
             self.y-=speed
+
+        if(not pressed[pygame.K_e]):
+            self.eDown = False
+        if(pressed[pygame.K_e] and not self.eDown):
+            self.eDown = True
+            self.use()
 
         if(not pressed[pygame.K_SPACE]):
             self.spaceDown = False
@@ -301,23 +401,45 @@ class Player():
                 self.release()
 
     def grab(self):
-        closest = None
-        best = 100
-        for thing in world.things:
-            dist = abs(self.x-thing.x)+abs(self.y-thing.y)
-            if dist<best:
-                best = dist
-                closest = thing
+        closest = self.search(range=60)
         if closest:
             self.holding = closest
             world.things.remove(closest)
 
     def release(self):
-        self.holding.x = self.x
-        self.holding.y = self.y
-        world.things.append(self.holding)
-        self.holding = None
+        def releaseNormal():
+            self.holding.x = self.x
+            self.holding.y = self.y
+            world.things.append(self.holding)
+            self.holding = None
+        if(self.holding.type=="tree" and self.holding.size<=1):            
+            closest = self.search(filter=lambda x:x.type=="stone" or x.type=="pebble")
+            if closest:
+                world.things.remove(closest)
+                if(closest.type=="stone"):
+                    hatchet=Hatchet(x=closest.x,y=closest.y)
+                if(closest.type=="pebble"):
+                    hatchet=Shovel(x=closest.x,y=closest.y)
+                hatchet.setSize(closest.size)
+                hatchet.uses=max(int(hatchet.size)*hatchet.uses,1)
+                world.things.append(hatchet)
+                self.holding = None
+            else:
+                releaseNormal()
+        elif(self.holding.type=="flower"):
+            if(world.getTile(self.x,self.y).type=="snow"):
+                flower=IceFlower(x=self.x,y=self.y)
+                flower.setSize(self.holding.size)
+                world.things.append(flower)
+                self.holding = None
+            else:
+                releaseNormal()
+        else:
+            releaseNormal()
 
+    def use(self):
+        if(self.holding):
+            self.holding.use()
     def draw(self, x, y): #becuase world sends these
         world.camera.drawImage(self.image, self.x-gridSize*self.size//2, self.y-gridSize*self.size)
         if self.holding:
@@ -329,7 +451,7 @@ class Player():
 
 world = World()
 world.generateWorld()
-
+#world.player.holding=Shovel(x=world.player.x,y=world.player.x)
 
 clock = pygame.time.Clock()
 running = True
@@ -347,8 +469,9 @@ while running:
     gameDisplay.fill((25,25,105))
     world.draw()
 
-    pygame.display.flip()
-    (clock.tick(20000))
+    pygame.display.update() # flip?
+    clock.tick(20000)
+
 
 
 pygame.quit()
