@@ -445,7 +445,7 @@ class Player():
         if self.holding:
             self.holding.x=self.x
             self.holding.y=self.y-10
-            self.holding.draw()
+            self.holding.draw(self.x,self.y)
 
 
 
