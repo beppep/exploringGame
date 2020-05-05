@@ -8,7 +8,7 @@ import worldgen
 screenWidth = 1300
 screenHeight = 700
 gameDisplay = pygame.display.set_mode((screenWidth, screenHeight))
-gridSize = 32
+gridSize = 64
 tiles = []
 
 def loadImage(textureName, size=gridSize):
@@ -44,7 +44,7 @@ class World():
     def generateWorld(self):
         
         self.generateTiles()        
-        #self.generateThings()
+        self.generateThings()
         self.player = Player()
         self.camera = Camera()
 
@@ -65,7 +65,7 @@ class World():
             thing.draw(x,y)
     
     def makeThing(self, creator, cls, size=None):
-        spread = gridSize//8 #spread kan vara ett argument i guess
+        spread = gridSize//4 #spread kan vara ett argument i guess
         thing=cls(x=creator.x+random.randrange(-spread,spread),y=creator.y+random.randrange(-spread,spread))
         if size:
             thing.setSize(size)
@@ -112,7 +112,7 @@ class World():
 
 
     def generateThings(self):
-        for i in range(500):
+        for i in range(100):
             x=random.randint(0,32*32/4-1)
             y=random.randint(0,18*32/4-1)
             self.things.append(Animus(x*gridSize,y*gridSize))
@@ -207,6 +207,7 @@ class Flower(Thing):
 
     def drop(self):
         if(world.getTile(self.x,self.y).type=="snow"):
+            world.things.remove(self)
             world.makeThing(self, IceFlower, size=self.size)
 
 class IceFlower(Thing):
@@ -227,23 +228,22 @@ class Hatchet(Thing):
         thing = world.search(self, filterer)
         if thing:
             self.uses-=1
+            world.things.remove(thing)
             if(thing.type=="tree"):
-                world.things.remove(closest)
                 for i in range(random.randint(1,2)):
-                    world.makeThing(self, Log, size=closest.size/2)
+                    world.makeThing(thing, Log, size=thing.size/2)
             elif(thing.type=="stone"):
-                world.things.remove(closest)
                 for i in range(random.randint(1,2)):
-                    world.makeThing(self, Stone, size=closest.size)
+                    world.makeThing(thing, Pebble, size=thing.size)
                 if(random.random()<0.2):
-                    world.makeThing(self, Ruby, size=closest.size)
+                    world.makeThing(thing, Ruby, size=thing.size)
         if(self.uses<=0):
             world.player.holding=None
 
 class Shovel(Thing):
 
     def __init__(self,x=0,y=0):
-        super(Shovel, self).__init__(x,y)
+        super().__init__(x,y)
         self.type="shovel"
         self.uses=10
         self.setSize(1)
@@ -263,7 +263,7 @@ class Shovel(Thing):
 class Tree(Thing):
 
     def __init__(self,x=0,y=0):
-        super(Tree, self).__init__(x,y)
+        super().__init__(x,y)
         self.type="tree"
         self.setSize(2)
 
@@ -272,20 +272,22 @@ class Tree(Thing):
             rock = world.search(self, filter=lambda x:x.type in ["stone", "pebble"])
             if rock:
                 world.things.remove(rock)
+                world.things.remove(self)
                 if(rock.type=="stone"):
                     cls=Hatchet
                 if(rock.type=="pebble"):
                     cls=Shovel
-                tool = world.makeThing(cls, rock.x, rock.y, size=rock.size)
+                tool = world.makeThing(rock, cls, size=rock.size)
+                print("made tool")
                 tool.uses=max(int(tool.size)*tool.uses,1)
                 world.things.append(tool)
 
     def update(self):
         ground = world.getTile(self.x,self.y)
 
-        super(Tree, self).update()
+        super().update()
         if ground.type=="snow":
-            self.size-=0.001
+            self.size-=0.1 #0.001
             if self.size<=0:
                 world.things.remove(self)
             else:
@@ -296,34 +298,34 @@ class Tree(Thing):
                 world.tiles[ground.y//gridSize][ground.x//gridSize]=Tile("sand",ground.x,ground.y)
 class Log(Thing):
     def __init__(self,x=0,y=0):
-        super(Log, self).__init__(x,y)
+        super().__init__(x,y)
         self.type="log"
         self.setSize(1)
 class Ruby(Thing):
     def __init__(self,x=0,y=0):
-        super(Ruby, self).__init__(x,y)
+        super().__init__(x,y)
         self.type="ruby"
         self.setSize(1)
 class Pebble(Thing):
     def __init__(self,x=0,y=0):
-        super(Pebble, self).__init__(x,y)
+        super().__init__(x,y)
         self.type="pebble"
         self.setSize(1)
 
 class Animal(Thing):
     def __init__(self, x=0, y=0):
-        super(Animal, self).__init__(x,y)
+        super().__init__(x,y)
 
 class Animus(Animal):
 
     def __init__(self,x,y):
-        super(Animus, self).__init__(x,y)
+        super().__init__(x,y)
         self.type = "animus"
         self.setSize(1)
         self.speed=2
 
     def update(self):
-        super(Animus, self).update()
+        super().update()
 
         dx=random.choice([-self.speed,0,self.speed])
         dy=random.choice([-self.speed,0,self.speed])
@@ -334,14 +336,14 @@ class Animus(Animal):
 class Gremlin(Animal):
 
     def __init__(self,x=0,y=0):
-        super(Gremlin, self).__init__(x,y)
+        super().__init__(x,y)
         self.type="gremlin"
         self.speed=2
 
         self.setSize(1)
 
     def update(self):
-        super(Gremlin, self).update()
+        super().update()
 
         dx=random.choice([-self.speed,0,self.speed])
         dy=random.choice([-self.speed,0,self.speed])
@@ -360,7 +362,9 @@ class Gremlin(Animal):
 
 class Player():
 
-    speed = gridSize//16
+    speed = gridSize//2
+
+    dropToUse = False
 
     idleImage = loadImage("idle.png")
 
@@ -419,12 +423,14 @@ class Player():
     def release(self):
         self.holding.x = self.x
         self.holding.y = self.y
-        self.holding.drop()
         world.things.append(self.holding)
+        self.holding.drop() #after adding!
+        if self.dropToUse:
+            self.holding.use()
         self.holding = None
         
     def use(self):
-        if(self.holding):
+        if(self.holding) and not self.dropToUse:
             self.holding.use()
     def draw(self, x, y): #becuase world sends these
         world.camera.drawImage(self.image, self.x-gridSize*self.size//2, self.y-gridSize*self.size)
@@ -437,7 +443,7 @@ class Player():
 
 world = World()
 world.generateWorld()
-world.player.holding=Shovel(x=world.player.x,y=world.player.x)
+world.player.holding=Hatchet(x=world.player.x,y=world.player.x)
 
 clock = pygame.time.Clock()
 running = True
