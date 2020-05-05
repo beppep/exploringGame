@@ -147,7 +147,6 @@ class Tile():
         
         if(2*dx<wdt and 2*dy<hgt) and (2*-dx<wdt and 2*-dy<hgt):
             world.camera.drawImage(self.images[self.type], self.x, self.y)
-        
 
 class Camera():
 
@@ -172,6 +171,7 @@ class Thing():
 
     def use(self):
         pass
+        #self.drop() # kinda nice
     def drop(self):
         pass
     def setSize(self, size):
@@ -193,12 +193,6 @@ class Thing():
         if(2*dx<wdt and 2*dy<hgt) and (2*-dx<wdt and 2*-dy<hgt):
             world.camera.drawImage(self.image, self.x-gridSize*self.size//2, self.y-gridSize*self.size)
 
-class Stone(Thing):
-    def __init__(self,x=0,y=0):
-        super(Stone, self).__init__(x,y)
-        self.type="stone"
-        self.setSize(1)
-
 class Flower(Thing):
     def __init__(self,x=0,y=0):
         super(Flower, self).__init__(x,y)
@@ -209,7 +203,6 @@ class Flower(Thing):
         if(world.getTile(self.x,self.y).type=="snow"):
             world.things.remove(self)
             world.makeThing(self, IceFlower, size=self.size)
-
 class IceFlower(Thing):
     def __init__(self,x=0,y=0):
         super(IceFlower, self).__init__(x,y)
@@ -239,7 +232,6 @@ class Hatchet(Thing):
                     world.makeThing(thing, Ruby, size=thing.size)
         if(self.uses<=0):
             world.player.holding=None
-
 class Shovel(Thing):
 
     def __init__(self,x=0,y=0):
@@ -260,6 +252,11 @@ class Shovel(Thing):
             if(self.uses<=0):
                 world.player.holding=None
 
+class Stone(Thing):
+    def __init__(self,x=0,y=0):
+        super(Stone, self).__init__(x,y)
+        self.type="stone"
+        self.setSize(1)
 class Tree(Thing):
 
     def __init__(self,x=0,y=0):
@@ -278,16 +275,14 @@ class Tree(Thing):
                 if(rock.type=="pebble"):
                     cls=Shovel
                 tool = world.makeThing(rock, cls, size=rock.size)
-                print("made tool")
                 tool.uses=max(int(tool.size)*tool.uses,1)
-                world.things.append(tool)
 
     def update(self):
         ground = world.getTile(self.x,self.y)
 
         super().update()
         if ground.type=="snow":
-            self.size-=0.1 #0.001
+            self.size-=0.001 #0.001
             if self.size<=0:
                 world.things.remove(self)
             else:
@@ -332,7 +327,6 @@ class Animus(Animal):
         if world.getTile(self.x+dx, self.y+dy).type!="water": #likeit?()
             self.x+=dx
             self.y+=dy
-
 class Gremlin(Animal):
 
     def __init__(self,x=0,y=0):
@@ -362,9 +356,7 @@ class Gremlin(Animal):
 
 class Player():
 
-    speed = gridSize//2
-
-    dropToUse = False
+    speed = gridSize//8
 
     idleImage = loadImage("idle.png")
 
@@ -425,13 +417,12 @@ class Player():
         self.holding.y = self.y
         world.things.append(self.holding)
         self.holding.drop() #after adding!
-        if self.dropToUse:
-            self.holding.use()
         self.holding = None
         
     def use(self):
-        if(self.holding) and not self.dropToUse:
+        if(self.holding):
             self.holding.use()
+
     def draw(self, x, y): #becuase world sends these
         world.camera.drawImage(self.image, self.x-gridSize*self.size//2, self.y-gridSize*self.size)
         if self.holding:
