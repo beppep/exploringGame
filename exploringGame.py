@@ -14,14 +14,11 @@ tiles = []
 def loadImage(textureName, size=gridSize):
     name = os.path.join("textures", textureName)
     image = pygame.image.load(name).convert_alpha()
+    image = pygame.transform.scale(image, (size, size))
 
+    #img_surface = image
     #image = pygame.transform.flip(image, True, False)
-    
-    img_surface = pygame.Surface((size, size), pygame.SRCALPHA)
-    img_surface.fill((0, 0, 0, 0))
-    pygame.transform.scale(image, (size, size), img_surface)
-    
-    return img_surface
+    return image
 
 def collides(self, other):
         r = self.__class__.radius + other.__class__.radius
@@ -95,7 +92,21 @@ class World():
                     best = dist
                     closest = thing
         return closest
-
+    def searchMany(self,obj,filters=[lambda x:True]*2,range=1):
+        objects=[]
+        for objFilter in filters:
+            closest=self.search(obj,filter=objFilter,range=range)
+            if(closest):
+                objects.append(closest)
+                self.things.remove(closest)
+            else:
+                break
+        if(len(objects)==len(filters)):
+            return objects
+        else:
+            for obj in objects:
+                self.things.append(obj)
+            return None
     def generateTiles(self):
         terrain = worldgen.Terrain()
         terrain.generate()
@@ -195,7 +206,6 @@ class Flower(Thing):
         super(Flower, self).__init__(x,y)
         self.type="flower"
         self.setSize(1)
-
     def drop(self):
         super().drop()
         if(world.getTile(self.x,self.y).type=="snow"):
@@ -206,6 +216,16 @@ class IceFlower(Thing):
         super(IceFlower, self).__init__(x,y)
         self.type="iceflower"
         self.setSize(1)
+    def use(self):
+        ground = world.getTile(self.x, self.y)
+        if ground.type=="lightWater":
+            ground.type = "ice"
+            ground.image=ground.images["ice"]
+            world.player.holding=None
+        elif(ground.type!="water" and ground.type!="snow" and ground.type!="ice"):
+            ground.type = "snow"
+            ground.image=ground.images["snow"]
+            world.player.holding=None
 
 class Hatchet(Thing):
     def __init__(self,x=0,y=0):
@@ -215,7 +235,7 @@ class Hatchet(Thing):
         self.setSize(1)
     def use(self):
         print("uses:",self.uses)
-        filterer = lambda x: x.type in ["tree","stone"]
+        filterer = lambda x: x.type in ["tree","stone","flower","iceflower"]
         thing = world.search(self, filterer)
         if thing:
             self.uses-=1
@@ -223,6 +243,8 @@ class Hatchet(Thing):
             if(thing.type=="tree"):
                 for i in range(random.randint(1,2)):
                     world.makeThing(thing, Log, size=thing.size/2)
+            elif(thing.type=="flower" or thing.type=="iceflower"):
+                world.makeThing(thing, Stem, size=thing.size)
             elif(thing.type=="stone"):
                 for i in range(random.randint(1,2)):
                     world.makeThing(thing, Pebble, size=thing.size)
@@ -252,7 +274,7 @@ class Shovel(Thing):
 
 class Stone(Thing):
     def __init__(self,x=0,y=0):
-        super(Stone, self).__init__(x,y)
+        super().__init__(x,y)
         self.type="stone"
         self.setSize(1)
 class Tree(Thing):
@@ -261,20 +283,6 @@ class Tree(Thing):
         super().__init__(x,y)
         self.type="tree"
         self.setSize(2)
-
-    def drop(self):
-        super().drop()
-        if self.size<1:
-            rock = world.search(self, filter=lambda x:x.type in ["stone", "pebble"])
-            if rock:
-                world.things.remove(rock)
-                world.things.remove(self)
-                if(rock.type=="stone"):
-                    cls=Hatchet
-                if(rock.type=="pebble"):
-                    cls=Shovel
-                tool = world.makeThing(rock, cls, size=rock.size)
-                tool.uses=max(int(tool.size)*tool.uses,1)
 
     def update(self):
         ground = world.getTile(self.x,self.y)
@@ -300,12 +308,49 @@ class Ruby(Thing):
         super().__init__(x,y)
         self.type="ruby"
         self.setSize(1)
+    
+    def drop(self):
+        ground = world.getTile(self.x,self.y)
+        if ground.type=="water":
+            world.things.remove(self)
+            if(random.random()<0.3):
+                world.makeThing(self, Sapphire, size=self.size)
 class Pebble(Thing):
     def __init__(self,x=0,y=0):
         super().__init__(x,y)
         self.type="pebble"
         self.setSize(1)
-
+class Sapphire(Thing):
+    def __init__(self,x=0,y=0):
+        super().__init__(x,y)
+        self.type="sapphire"
+        self.setSize(1)
+    def drop(self):
+        pass
+class Stick(Thing):
+    def __init__(self,x=0,y=0):
+        super().__init__(x,y)
+        self.type="stick"
+        self.setSize(1)
+class Stem(Thing):
+    def __init__(self,x=0,y=0):
+        super().__init__(x,y)
+        self.type="stem"
+        self.setSize(1)
+class IceCrystal(Thing):
+    def __init__(self,x=0,y=0):
+        super().__init__(x,y)
+        self.type="icecrystal"
+        self.setSize(1)
+class IceWand(Thing):
+    def __init__(self,x=0,y=0):
+        super().__init__(x,y)
+        self.type="icewand"
+        self.setSize(1)
+        self.uses=50
+        self.active=False
+    def use(self):
+        self.active=not self.active
 class Animal(Thing): #pass lol
     pass
 
@@ -354,9 +399,33 @@ class Gremlin(Animal):
 
 class Player():
 
-    speed = gridSize//2
+    speed = gridSize//8 # //2 är för sanbbt
 
     idleImage = loadImage("idle.png")
+    
+    def hatchet(things):
+        rock=things[1]
+        if(rock.type=="stone"):
+            cls=Hatchet
+        if(rock.type=="pebble"):
+            cls=Shovel
+        tool = world.makeThing(rock, cls, size=rock.size)
+        tool.uses=max(int(tool.size**2)*tool.uses,1)
+    def typeFunc(type):
+
+        return lambda x:x.type==type
+    def createObject(cls,tool=False):
+        def func(things):
+            obj = world.makeThing(things[0], cls, size=things[0].size)
+            if(tool):
+                 obj.uses=max(int(obj.size**2)*obj.uses,1)
+        return func
+    craftingTable = [
+    [[lambda x:x.type=="tree" and x.size<=1,lambda x:x.type in ["stone", "pebble"]],hatchet],
+    [[typeFunc("log"),typeFunc("stem")],createObject(Stick)],
+    [[typeFunc("sapphire")]+[typeFunc("iceflower")]*3,createObject(IceCrystal)],
+    [[typeFunc("icecrystal")]+[typeFunc("stick")],createObject(IceWand,tool=True)],
+    ]
 
     def __init__(self, x=16*32//worldgen.Terrain.gridSize*gridSize, y=16*18//worldgen.Terrain.gridSize*gridSize):
         self.x = x
@@ -370,14 +439,26 @@ class Player():
     def move(self, pressed):
         speed = self.speed
         ground = world.getTile(self.x, self.y)
+        if(self.holding and self.holding.type=="icewand"):
+            if(self.holding.active):
+                if ground.type=="lightWater":
+                    print("uses:",self.holding.uses)
+                    ground.type = "ice"
+                    ground.image=ground.images["ice"]
+                    self.holding.uses-=1
+                    if(self.holding.uses==0):
+                        self.holding=None
+                elif(ground.type!="water" and ground.type!="snow" and ground.type!="ice"):
+                    print("uses:",self.holding.uses)
+                    ground.type = "snow"
+                    ground.image=ground.images["snow"]
+                    self.holding.uses-=1
+                    if(self.holding.uses==0):
+                        self.holding=None
         if ground.type=="water":
             speed*=0.25
         if ground.type=="lightWater":
-            if(self.holding and self.holding.type=="iceflower"):
-                ground.type = "ice"
-                ground.image=ground.images["ice"]
-            else:
-                speed*=0.5 #<- else
+            speed*=0.5 #<- else
         if ground.type=="ice":
             speed*=2           
         if(pressed[pygame.K_d]):
@@ -415,11 +496,19 @@ class Player():
         self.holding.y = self.y
         world.things.append(self.holding)
         self.holding.drop() #after adding!
+        self.craft()
         self.holding = None
+
         
     def use(self):
         if(self.holding):
             self.holding.use()
+    def craft(self):
+        #add check if holding is in recipes to reduce lag
+        for recipe in self.craftingTable:
+            things = world.searchMany(world.player,filters=recipe[0],range=1)
+            if(things):
+                recipe[1](things)
 
     def draw(self, x, y): #becuase world sends these
         world.camera.drawImage(self.image, self.x-gridSize*self.size//2, self.y-gridSize*self.size)
@@ -432,8 +521,8 @@ class Player():
 
 world = World()
 world.generateWorld()
-world.player.holding=Hatchet(x=world.player.x,y=world.player.x)
-
+#world.player.holding=Stick(x=world.player.x,y=world.player.x)
+#world.makeThing(world.player, IceCrystal, size=2)
 clock = pygame.time.Clock()
 running = True
 while running:
@@ -451,7 +540,7 @@ while running:
     world.draw()
 
     pygame.display.update() # flip?
-    print(clock.tick(20000))
+    clock.tick(20000)
 
 
 
