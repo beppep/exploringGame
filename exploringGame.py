@@ -14,14 +14,13 @@ tiles = []
 def loadImage(textureName, size=gridSize):
     name = os.path.join("textures", textureName)
     image = pygame.image.load(name).convert_alpha()
-    image = pygame.transform.scale(image, (size, size))
 
-    #img_surface = image
     #image = pygame.transform.flip(image, True, False)
-    img_rect = image.get_rect()
-    img_surface = pygame.Surface((img_rect.width, img_rect.height), pygame.SRCALPHA)
+    
+    img_surface = pygame.Surface((size, size), pygame.SRCALPHA)
     img_surface.fill((0, 0, 0, 0))
-    img_surface.blit(image, img_rect)
+    pygame.transform.scale(image, (size, size), img_surface)
+    
     return img_surface
 
 def collides(self, other):
@@ -35,6 +34,7 @@ def collides(self, other):
 
 class World():
 
+    a=0
     def __init__(self):
         self.tiles = []
         self.player=None
@@ -56,9 +56,14 @@ class World():
 
     def draw(self):
         x,y = self.player.x, self.player.y
-        for row in self.tiles:
-            for tile in row:
-                tile.draw(x, y)
+        wdt = 700
+        hgt = 400
+        for row in range(int((y-hgt)//gridSize), int((y+hgt)//gridSize)):
+            if row>=0 and row<len(self.tiles):
+                for col in range(int((x-wdt)//gridSize), int((x+wdt)//gridSize)):
+                    if col<len(self.tiles[row]):
+                        self.tiles[row][col].draw()
+
         thingsToDraw = self.things + [self.player]
         thingsToDraw.sort(key=lambda x:x.y)
         for thing in thingsToDraw:
@@ -73,12 +78,11 @@ class World():
         return thing
 
     def getTile(self, x, y):
-        x = x/gridSize
-        y = y/gridSize
-        if len(self.tiles)>y:
-            if len(self.tiles[int(y)])>x:
-                return self.tiles[int(y)][int(x)]
-        return None
+        #print(world.a)
+        world.a+=1
+        x = x//gridSize
+        y = y//gridSize
+        return self.tiles[int(y)][int(x)]
 
     def search(self, obj,filter=lambda x:True,range=1):
         closest = None
@@ -115,7 +119,8 @@ class World():
         for i in range(100):
             x=random.randint(0,32*32/4-1)
             y=random.randint(0,18*32/4-1)
-            self.things.append(Animus(x*gridSize,y*gridSize))
+            if world.getTile(x,y).type!="water":
+                self.things.append(Animus(x*gridSize,y*gridSize))
 
 class Tile():
 
@@ -137,16 +142,8 @@ class Tile():
         elif self.type == "snow" and random.random()<0.3:
             world.things.append(Stone(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
 
-    def draw(self, x,y):
-        
-        #pl = world.player
-        dx = (self.x-x)
-        dy = (self.y-y)
-        wdt = 1400
-        hgt = 800
-        
-        if(2*dx<wdt and 2*dy<hgt) and (2*-dx<wdt and 2*-dy<hgt):
-            world.camera.drawImage(self.images[self.type], self.x, self.y)
+    def draw(self):
+        world.camera.drawImage(self.images[self.type], self.x, self.y)
 
 class Camera():
 
@@ -155,12 +152,11 @@ class Camera():
         self.y = 0
 
     def move(self):
-        self.x = world.player.x
-        self.y = world.player.y
+        self.x = world.player.x-screenWidth//2
+        self.y = world.player.y-screenHeight//2
 
     def drawImage(self, image, x, y):
-        r = gridSize//2
-        gameDisplay.blit(image, (x-self.x+screenWidth//2-r, y-self.y+screenHeight//2-r))
+        gameDisplay.blit(image, (x-self.x, y-self.y))
 
 class Thing():
     
@@ -172,19 +168,20 @@ class Thing():
     def use(self):
         pass
         #self.drop() # kinda nice
-    def drop(self):
+    def update(self):
         pass
     def setSize(self, size):
         self.size=size
         self.image = loadImage(self.type+".png",int(self.size*gridSize))
 
-    def update(self):
+    def drop(self):
         ground = world.getTile(self.x,self.y)
         if ground.type=="water":
             world.things.remove(self)
 
     def draw(self, x, y):
         #pl = world.player
+
         dx = (self.x-x)
         dy = (self.y-y)
         wdt = 1400
@@ -200,6 +197,7 @@ class Flower(Thing):
         self.setSize(1)
 
     def drop(self):
+        super().drop()
         if(world.getTile(self.x,self.y).type=="snow"):
             world.things.remove(self)
             world.makeThing(self, IceFlower, size=self.size)
@@ -211,12 +209,12 @@ class IceFlower(Thing):
 
 class Hatchet(Thing):
     def __init__(self,x=0,y=0):
-        super(Hatchet, self).__init__(x,y)
+        super().__init__(x,y)
         self.type="hatchet"
         self.uses=5
         self.setSize(1)
     def use(self):
-        print(self.uses)
+        print("uses:",self.uses)
         filterer = lambda x: x.type in ["tree","stone"]
         thing = world.search(self, filterer)
         if thing:
@@ -243,7 +241,7 @@ class Shovel(Thing):
     conversion = {"snow":"darkGrass","darkGrass":"sand","grass":"sand","sand":"lightWater","ice":"lightWater"}
 
     def use(self):
-        print(self.uses)
+        print("uses:",self.uses)
         ground = world.getTile(self.x, self.y)
         if ground.type in Shovel.conversion:
             self.uses-=1
@@ -265,6 +263,7 @@ class Tree(Thing):
         self.setSize(2)
 
     def drop(self):
+        super().drop()
         if self.size<1:
             rock = world.search(self, filter=lambda x:x.type in ["stone", "pebble"])
             if rock:
@@ -282,15 +281,15 @@ class Tree(Thing):
 
         super().update()
         if ground.type=="snow":
-            self.size-=0.001 #0.001
-            if self.size<=0:
-                world.things.remove(self)
-            else:
-                self.image = loadImage("tree.png",int(self.size*gridSize))
+            if random.random()<0.1:
+                self.setSize(self.size-0.01)
+                if self.size<=0:
+                    world.things.remove(self)
         if ground.type=="lightWater":
-            self.setSize(self.size+0.001)
-            if random.random()<0.01:
-                world.tiles[ground.y//gridSize][ground.x//gridSize]=Tile("sand",ground.x,ground.y)
+            if random.random()<0.1:
+                self.setSize(self.size+0.01)
+                if random.random()<0.1:
+                    world.tiles[ground.y//gridSize][ground.x//gridSize]=Tile("sand",ground.x,ground.y)
 class Log(Thing):
     def __init__(self,x=0,y=0):
         super().__init__(x,y)
@@ -307,9 +306,8 @@ class Pebble(Thing):
         self.type="pebble"
         self.setSize(1)
 
-class Animal(Thing):
-    def __init__(self, x=0, y=0):
-        super().__init__(x,y)
+class Animal(Thing): #pass lol
+    pass
 
 class Animus(Animal):
 
@@ -320,7 +318,7 @@ class Animus(Animal):
         self.speed=2
 
     def update(self):
-        super().update()
+        super().update() #pass lol
 
         dx=random.choice([-self.speed,0,self.speed])
         dy=random.choice([-self.speed,0,self.speed])
@@ -337,7 +335,7 @@ class Gremlin(Animal):
         self.setSize(1)
 
     def update(self):
-        super().update()
+        super().update() #pass lol
 
         dx=random.choice([-self.speed,0,self.speed])
         dy=random.choice([-self.speed,0,self.speed])
@@ -356,7 +354,7 @@ class Gremlin(Animal):
 
 class Player():
 
-    speed = gridSize//8
+    speed = gridSize//2
 
     idleImage = loadImage("idle.png")
 
@@ -375,11 +373,11 @@ class Player():
         if ground.type=="water":
             speed*=0.25
         if ground.type=="lightWater":
-            speed*=0.5
-            if(self.holding):
-                if(self.holding.type=="iceflower"):
-                    ground.type = "ice"
-                    ground.image=ground.images["ice"]
+            if(self.holding and self.holding.type=="iceflower"):
+                ground.type = "ice"
+                ground.image=ground.images["ice"]
+            else:
+                speed*=0.5 #<- else
         if ground.type=="ice":
             speed*=2           
         if(pressed[pygame.K_d]):
@@ -453,7 +451,7 @@ while running:
     world.draw()
 
     pygame.display.update() # flip?
-    clock.tick(20000)
+    print(clock.tick(20000))
 
 
 
