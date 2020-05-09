@@ -128,10 +128,10 @@ class World():
 
     def generateThings(self):
         for i in range(100):
-            x=random.randint(0,32*32/4-1)
-            y=random.randint(0,18*32/4-1)
+            x=random.randint(0,32*32*gridSize/4-1)
+            y=random.randint(0,18*32*gridSize/4-1)
             if world.getTile(x,y).type!="water":
-                self.things.append(Animus(x*gridSize,y*gridSize))
+                self.things.append(Animus(x,y))
 
 class Tile():
 
@@ -143,13 +143,14 @@ class Tile():
         self.x = x
         self.y = y
         self.type = typee
-        #self.image=self.images[self.type]
-        if self.type == "grass" and random.random()<0.01:
+        if self.type == "grass" and random.random()<0.03:
             world.things.append(Flower(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
         if self.type == "grass" and random.random()<0.2:
             world.things.append(Tree(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
         elif self.type == "darkGrass" and random.random()<0.5:
             world.things.append(Tree(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
+        elif self.type == "darkGrass" and random.random()<0.1:
+            world.things.append(Stone(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
         elif self.type == "snow" and random.random()<0.3:
             world.things.append(Stone(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
 
@@ -220,11 +221,9 @@ class IceFlower(Thing):
         ground = world.getTile(self.x, self.y)
         if ground.type=="lightWater":
             ground.type = "ice"
-            ground.image=ground.images["ice"]
             world.player.holding=None
         elif(ground.type!="water" and ground.type!="snow" and ground.type!="ice"):
             ground.type = "snow"
-            ground.image=ground.images["snow"]
             world.player.holding=None
 
 class Hatchet(Thing):
@@ -235,7 +234,7 @@ class Hatchet(Thing):
         self.setSize(1)
     def use(self):
         print("uses:",self.uses)
-        filterer = lambda x: x.type in ["tree","stone","flower","iceflower"]
+        filterer = lambda x: x.type in ["tree","stone","flower","iceflower","animus"]
         thing = world.search(self, filterer)
         if thing:
             self.uses-=1
@@ -268,7 +267,6 @@ class Shovel(Thing):
         if ground.type in Shovel.conversion:
             self.uses-=1
             ground.type = Shovel.conversion[ground.type]
-            ground.image=ground.images[ground.type]
             if(self.uses<=0):
                 world.player.holding=None
 
@@ -286,8 +284,6 @@ class Tree(Thing):
 
     def update(self):
         ground = world.getTile(self.x,self.y)
-
-        super().update()
         if ground.type=="snow":
             if random.random()<0.1:
                 self.setSize(self.size-0.01)
@@ -303,6 +299,9 @@ class Log(Thing):
         super().__init__(x,y)
         self.type="log"
         self.setSize(1)
+
+    def drop(self):
+        pass
 class Ruby(Thing):
     def __init__(self,x=0,y=0):
         super().__init__(x,y)
@@ -311,15 +310,21 @@ class Ruby(Thing):
     
     def drop(self):
         ground = world.getTile(self.x,self.y)
-        if ground.type=="water":
+        if ground.type in ["water", "lightWater"]:
             world.things.remove(self)
-            if(random.random()<0.3):
+            if(random.random()<1.3):
                 world.makeThing(self, Sapphire, size=self.size)
 class Pebble(Thing):
     def __init__(self,x=0,y=0):
         super().__init__(x,y)
         self.type="pebble"
         self.setSize(1)
+
+    def use(self):
+        ground = world.getTile(self.x,self.y)
+        if ground.type == "grass":
+            ground.type = "darkGrass"
+            world.player.holding = None
 class Sapphire(Thing):
     def __init__(self,x=0,y=0):
         super().__init__(x,y)
@@ -332,6 +337,13 @@ class Stick(Thing):
         super().__init__(x,y)
         self.type="stick"
         self.setSize(1)
+
+    def use(self):
+        ground = world.getTile(self.x,self.y)
+        if ground.type == "grass":
+            for i in range(math.roof(self.size**2)):
+                world.makeThing(world.player, Flower, size=self.size)
+            world.player.holding = None
 class Stem(Thing):
     def __init__(self,x=0,y=0):
         super().__init__(x,y)
@@ -399,7 +411,7 @@ class Gremlin(Animal):
 
 class Player():
 
-    speed = gridSize//8 # //2 är för sanbbt
+    speed = gridSize//16 # //2 är för sanbbt
 
     idleImage = loadImage("idle.png")
     
@@ -420,6 +432,7 @@ class Player():
             if(tool):
                  obj.uses=max(int(obj.size**2)*obj.uses,1)
         return func
+
     craftingTable = [
     [[lambda x:x.type=="tree" and x.size<=1,lambda x:x.type in ["stone", "pebble"]],hatchet],
     [[typeFunc("log"),typeFunc("stem")],createObject(Stick)],
@@ -444,21 +457,19 @@ class Player():
                 if ground.type=="lightWater":
                     print("uses:",self.holding.uses)
                     ground.type = "ice"
-                    ground.image=ground.images["ice"]
                     self.holding.uses-=1
                     if(self.holding.uses==0):
                         self.holding=None
                 elif(ground.type!="water" and ground.type!="snow" and ground.type!="ice"):
                     print("uses:",self.holding.uses)
                     ground.type = "snow"
-                    ground.image=ground.images["snow"]
                     self.holding.uses-=1
                     if(self.holding.uses==0):
                         self.holding=None
         if ground.type=="water":
             speed*=0.25
         if ground.type=="lightWater":
-            speed*=0.5 #<- else
+            speed*=0.5
         if ground.type=="ice":
             speed*=2           
         if(pressed[pygame.K_d]):
@@ -521,7 +532,7 @@ class Player():
 
 world = World()
 world.generateWorld()
-#world.player.holding=Stick(x=world.player.x,y=world.player.x)
+world.player.holding=Hatchet(x=world.player.x,y=world.player.x)
 #world.makeThing(world.player, IceCrystal, size=2)
 clock = pygame.time.Clock()
 running = True
@@ -540,7 +551,7 @@ while running:
     world.draw()
 
     pygame.display.update() # flip?
-    clock.tick(20000)
+    print(clock.tick(60))
 
 
 

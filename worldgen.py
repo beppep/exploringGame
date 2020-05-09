@@ -9,7 +9,7 @@ class Terrain():
     gridSize = 4
     noiseScale = 50 # 100
     biomeScale = 8 # 8
-    biomePercentage=0.6 # 0.6
+    biomePercentage=0.7 # 0.6
     biomeSettings=[1,0.5,2] # [1,0.5,2]
     terrainSettings=[5,0.6,2] # [5,0.6,2] 
     islandFactor=0.7 
