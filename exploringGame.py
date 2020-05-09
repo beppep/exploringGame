@@ -8,7 +8,7 @@ import pickle
 
 screenWidth = 1300
 screenHeight = 700
-gridSize = 64
+gridSize = 64 
 
 if __name__ == "__main__":
     gameDisplay = pygame.display.set_mode((screenWidth, screenHeight))
@@ -132,7 +132,7 @@ class World():
                 #print(tile)
                 tile = Tile(tile,x=x*gridSize,y=y*gridSize)
                 self.tiles[y].append(tile)
-                if tile.type=="snow":
+                if tile.type==5:
                     snowtiles.append(tile)
 
         tileOfTheGremlin = random.choice(snowtiles)
@@ -143,28 +143,28 @@ class World():
         for i in range(100):
             x=random.randint(0,32*32*gridSize/4-1)
             y=random.randint(0,18*32*gridSize/4-1)
-            if world.getTile(x,y).type!="water":
+            if world.getTile(x,y).type!=0:
                 self.things.append(Animus(x,y))
 
 class Tile():
 
-    types = ["grass","sand","water","lightWater","darkGrass","snow","ice"]
+    types = {"water":0,"lightWater":1,"sand":2,"grass":3,"darkGrass":4,"snow":5,"ice":6}
 
-    images = {string:loadImage(string+".png") for string in types}
+    images = (lambda types=types:{types[key]:loadImage(key+".png") for key in types})() #list comprehension scope error solution. dont ask
 
     def __init__(self, typee, x=0, y=0):
         self.x = x
         self.y = y
         self.type = typee
-        if self.type == "grass" and random.random()<0.03:
+        if self.type == 3 and random.random()<0.03:
             world.things.append(Flower(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
-        if self.type == "grass" and random.random()<0.2:
+        elif self.type == 3 and random.random()<0.2:
             world.things.append(Tree(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
-        elif self.type == "darkGrass" and random.random()<0.5:
+        elif self.type == 4 and random.random()<0.5:
             world.things.append(Tree(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
-        elif self.type == "darkGrass" and random.random()<0.1:
+        elif self.type == 4 and random.random()<0.1:
             world.things.append(Stone(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
-        elif self.type == "snow" and random.random()<0.3:
+        elif self.type == 5 and random.random()<0.3:
             world.things.append(Stone(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
 
     def draw(self):
@@ -188,7 +188,7 @@ class Thing():
 
     def drop(self):
         ground = world.getTile(self.x,self.y)
-        if ground.type=="water":
+        if ground.type==Tile.types["water"]:
             world.things.remove(self)
 
     def draw(self, x, y):
@@ -208,7 +208,7 @@ class Flower(Thing):
         self.setSize(1)
     def drop(self):
         super().drop()
-        if(world.getTile(self.x,self.y).type=="snow"):
+        if(world.getTile(self.x,self.y).type==Tile.types["snow"]):
             world.things.remove(self)
             world.makeThing(self, IceFlower, size=self.size)
 class IceFlower(Thing):
@@ -216,13 +216,18 @@ class IceFlower(Thing):
         super(IceFlower, self).__init__(x,y)
         self.type="iceflower"
         self.setSize(1)
+    def drop(self):
+        super().drop()
+        if(world.getTile(self.x,self.y).type==Tile.types["lightWater"]):
+            world.things.remove(self)
+            world.makeThing(self, Flower, size=self.size)
     def use(self):
         ground = world.getTile(self.x, self.y)
-        if ground.type=="lightWater":
-            ground.type = "ice"
+        if ground.type==Tile.types["lightWater"]:
+            ground.type = Tile.types["ice"]
             world.player.holding=None
-        elif(ground.type!="water" and ground.type!="snow" and ground.type!="ice"):
-            ground.type = "snow"
+        elif not ground.type in [Tile.types["water"],Tile.types["snow"],Tile.types["ice"]]:
+            ground.type = Tile.types["snow"]
             world.player.holding=None
 
 class Hatchet(Thing):
@@ -258,7 +263,7 @@ class Shovel(Thing):
         self.uses=10
         self.setSize(1)
     
-    conversion = {"snow":"darkGrass","darkGrass":"sand","grass":"sand","sand":"lightWater","ice":"lightWater"}
+    conversion = {5:4,4:3,3:2,2:1,6:1}
 
     def use(self):
         print("uses:",self.uses)
@@ -284,14 +289,14 @@ class Tree(Thing):
     def update(self):
         if random.random()<0.1:
             ground = world.getTile(self.x,self.y)
-            if ground.type=="snow":
+            if ground.type==5:
                 self.setSize(self.size-0.01)
                 if self.size<=0:
                     world.things.remove(self)
-            if ground.type=="lightWater":
+            if ground.type==1:
                 self.setSize(self.size+0.01)
                 if random.random()<0.05:
-                    ground.type = "sand"
+                    ground.type = Tile.types["sand"]
 class Log(Thing):
     def __init__(self,x=0,y=0):
         super().__init__(x,y)
@@ -308,7 +313,7 @@ class Ruby(Thing):
     
     def drop(self):
         ground = world.getTile(self.x,self.y)
-        if ground.type in ["water", "lightWater"]:
+        if ground.type < 2:
             world.things.remove(self)
             if(random.random()<1.3):
                 world.makeThing(self, Sapphire, size=self.size)
@@ -320,8 +325,8 @@ class Pebble(Thing):
 
     def use(self):
         ground = world.getTile(self.x,self.y)
-        if ground.type == "grass":
-            ground.type = "darkGrass"
+        if ground.type == Tile.types["grass"]:
+            ground.type = Tile.types["darkGrass"]
             world.player.holding = None
 class Sapphire(Thing):
     def __init__(self,x=0,y=0):
@@ -338,7 +343,7 @@ class Stick(Thing):
 
     def use(self):
         ground = world.getTile(self.x,self.y)
-        if ground.type == "grass":
+        if ground.type == Tile.types["grass"]:
             world.makeThing(world.player, Flower, size=self.size)
             world.player.holding = None
 class Stem(Thing):
@@ -360,7 +365,7 @@ class Wand(Thing):
         self.active=False
     def use(self):
         ground = world.getTile(self.x,self.y)
-        if ground.type == "grass":
+        if ground.type == Tile.types["grass"]:
             self.uses-=1
             for i in range(math.ceil(random.randint(1,3))):
                 world.makeThing(world.player, Flower)
@@ -399,7 +404,7 @@ class Animus(Animal):
         super().update() #pass lol
         dx=random.choice([-self.speed,0,self.speed])
         dy=random.choice([-self.speed,0,self.speed])
-        if world.getTile(self.x+dx, self.y+dy).type!="water": #likeit?()
+        if world.getTile(self.x+dx, self.y+dy).type!=0: #likeit?()
             self.x+=dx
             self.y+=dy
 class Gremlin(Animal):
@@ -417,7 +422,7 @@ class Gremlin(Animal):
 
         dx=random.choice([-self.speed,0,self.speed])
         dy=random.choice([-self.speed,0,self.speed])
-        if world.getTile(self.x+dx, self.y+dy).type=="snow":
+        if world.getTile(self.x+dx, self.y+dy).type==Tile.types["snow"]:
             self.x+=dx
             self.y+=dy
 
@@ -480,21 +485,21 @@ class Player():
             if(self.holding.active):
                 if ground.type=="lightWater":
                     print("uses:",self.holding.uses)
-                    ground.type = "ice"
+                    ground.type = Tile.types["ice"]
                     self.holding.uses-=1
                     if(self.holding.uses==0):
                         self.holding=None
-                elif(ground.type!="water" and ground.type!="snow" and ground.type!="ice"):
+                elif not ground.type in [Tile.types["water"], Tile.types["snow"], Tile.types["ice"]]:
                     print("uses:",self.holding.uses)
-                    ground.type = "snow"
+                    ground.type = Tiles.types["snow"]
                     self.holding.uses-=1
                     if(self.holding.uses==0):
                         self.holding=None
-        if ground.type=="water":
+        if ground.type==0:
             speed*=0.25
-        if ground.type=="lightWater":
+        if ground.type==1:
             speed*=0.5
-        if ground.type=="ice":
+        if ground.type==6:
             speed*=2           
         if(pressed[pygame.K_d]):
             self.x+=speed
