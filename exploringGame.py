@@ -3,6 +3,7 @@ import random
 import time
 import os
 import worldgen
+import math
 
 
 screenWidth = 1300
@@ -249,8 +250,8 @@ class Hatchet(Thing):
                     world.makeThing(thing, Pebble, size=thing.size)
                 if(random.random()<0.2):
                     world.makeThing(thing, Ruby, size=thing.size)
-        if(self.uses<=0):
-            world.player.holding=None
+            if(self.uses<=0):
+                world.player.holding=None
 class Shovel(Thing):
 
     def __init__(self,x=0,y=0):
@@ -283,17 +284,16 @@ class Tree(Thing):
         self.setSize(2)
 
     def update(self):
-        ground = world.getTile(self.x,self.y)
-        if ground.type=="snow":
-            if random.random()<0.1:
+        if random.random()<0.1:
+            ground = world.getTile(self.x,self.y)
+            if ground.type=="snow":
                 self.setSize(self.size-0.01)
                 if self.size<=0:
                     world.things.remove(self)
-        if ground.type=="lightWater":
-            if random.random()<0.1:
+            if ground.type=="lightWater":
                 self.setSize(self.size+0.01)
-                if random.random()<0.1:
-                    world.tiles[ground.y//gridSize][ground.x//gridSize]=Tile("sand",ground.x,ground.y)
+                if random.random()<0.05:
+                    ground.type = "sand"
 class Log(Thing):
     def __init__(self,x=0,y=0):
         super().__init__(x,y)
@@ -341,14 +341,35 @@ class Stick(Thing):
     def use(self):
         ground = world.getTile(self.x,self.y)
         if ground.type == "grass":
-            for i in range(math.roof(self.size**2)):
-                world.makeThing(world.player, Flower, size=self.size)
+            world.makeThing(world.player, Flower, size=self.size)
             world.player.holding = None
 class Stem(Thing):
     def __init__(self,x=0,y=0):
         super().__init__(x,y)
         self.type="stem"
         self.setSize(1)
+class Crystal(Thing):
+    def __init__(self,x=0,y=0):
+        super().__init__(x,y)
+        self.type="crystal"
+        self.setSize(1)
+class Wand(Thing):
+    def __init__(self,x=0,y=0):
+        super().__init__(x,y)
+        self.type="wand"
+        self.setSize(1)
+        self.uses=5
+        self.active=False
+    def use(self):
+        ground = world.getTile(self.x,self.y)
+        if ground.type == "grass":
+            self.uses-=1
+            for i in range(math.ceil(random.randint(1,3))):
+                world.makeThing(world.player, Flower)
+            for i in range(math.ceil(random.randint(0,2))):
+                world.makeThing(world.player, Tree, size=1.5)
+            if self.uses<=0:
+                world.player.holding = None
 class IceCrystal(Thing):
     def __init__(self,x=0,y=0):
         super().__init__(x,y)
@@ -363,6 +384,7 @@ class IceWand(Thing):
         self.active=False
     def use(self):
         self.active=not self.active
+          
 class Animal(Thing): #pass lol
     pass
 
@@ -414,15 +436,16 @@ class Player():
     speed = gridSize//16 # //2 är för sanbbt
 
     idleImage = loadImage("idle.png")
-    
-    def hatchet(things):
+    """
+    def hatchet(things): #y??
         rock=things[1]
-        if(rock.type=="stone"):
+        if(rock.type=="stone"): 
             cls=Hatchet
         if(rock.type=="pebble"):
             cls=Shovel
         tool = world.makeThing(rock, cls, size=rock.size)
         tool.uses=max(int(tool.size**2)*tool.uses,1)
+    """ 
     def typeFunc(type):
 
         return lambda x:x.type==type
@@ -430,14 +453,17 @@ class Player():
         def func(things):
             obj = world.makeThing(things[0], cls, size=things[0].size)
             if(tool):
-                 obj.uses=max(int(obj.size**2)*obj.uses,1)
+                 obj.uses=max(int(obj.size**1*obj.uses),1)
         return func
 
     craftingTable = [
-    [[lambda x:x.type=="tree" and x.size<=1,lambda x:x.type in ["stone", "pebble"]],hatchet],
+    [[lambda x:x.type=="stone", lambda x:x.type=="tree" and x.size<=1],createObject(Hatchet,tool=True)],
+    [[lambda x:x.type=="pebble", lambda x:x.type=="tree" and x.size<=1],createObject(Shovel,tool=True)],
     [[typeFunc("log"),typeFunc("stem")],createObject(Stick)],
     [[typeFunc("sapphire")]+[typeFunc("iceflower")]*3,createObject(IceCrystal)],
+    [[typeFunc("ruby")]+[typeFunc("flower")]*3,createObject(Crystal)],
     [[typeFunc("icecrystal")]+[typeFunc("stick")],createObject(IceWand,tool=True)],
+    [[typeFunc("crystal")]+[typeFunc("stick")],createObject(Wand,tool=True)],
     ]
 
     def __init__(self, x=16*32//worldgen.Terrain.gridSize*gridSize, y=16*18//worldgen.Terrain.gridSize*gridSize):
@@ -506,14 +532,16 @@ class Player():
         self.holding.x = self.x
         self.holding.y = self.y
         world.things.append(self.holding)
-        self.holding.drop() #after adding!
-        self.craft()
+        self.holding.drop() #after appending!
+        self.craft() #can craft something else lol
         self.holding = None
 
         
     def use(self):
         if(self.holding):
             self.holding.use()
+        else:
+            self.craft()
     def craft(self):
         #add check if holding is in recipes to reduce lag
         for recipe in self.craftingTable:
@@ -533,7 +561,7 @@ class Player():
 world = World()
 world.generateWorld()
 world.player.holding=Hatchet(x=world.player.x,y=world.player.x)
-#world.makeThing(world.player, IceCrystal, size=2)
+world.makeThing(world.player, Crystal)
 clock = pygame.time.Clock()
 running = True
 while running:
