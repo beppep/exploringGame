@@ -24,7 +24,7 @@ class Terrain():
 
     waterlevel = 50 #20 if worley
     snowlevel = 75 #40 if worely
-    scheme = [[waterlevel-10,"water"],[waterlevel,"lightWater"],[waterlevel+5,"sand"],[waterlevel+15,"grass"],[snowlevel,"darkGrass"],[101,"snow"]]
+    scheme = [[waterlevel-10,0],[waterlevel,1],[waterlevel+5,2],[waterlevel+15,3],[snowlevel,4],[101,5]]
         
     def draw(self):
         for x in range(int(32*32/self.gridSize)):
