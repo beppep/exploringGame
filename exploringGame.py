@@ -388,26 +388,27 @@ class Animal(Thing): #pass lol
 
 class Animus(Animal):
 
+    speed = gridSize//16
+
     def __init__(self,x,y):
         super().__init__(x,y)
         self.type = "animus"
         self.setSize(1)
-        self.speed=2
 
     def update(self):
         super().update() #pass lol
-
         dx=random.choice([-self.speed,0,self.speed])
         dy=random.choice([-self.speed,0,self.speed])
         if world.getTile(self.x+dx, self.y+dy).type!="water": #likeit?()
             self.x+=dx
             self.y+=dy
 class Gremlin(Animal):
+    
+    speed = gridSize//16
 
     def __init__(self,x=0,y=0):
         super().__init__(x,y)
         self.type="gremlin"
-        self.speed=2
 
         self.setSize(1)
 
@@ -579,7 +580,7 @@ def loadWorld():
     except Exception as e:
         file = open(name, "x") #create
         world = None
-        print("error:",e)
+        print("Creating new world...")
     print("worldobject:",world)
     file.close()
     return world, name
@@ -601,7 +602,7 @@ def main():
         world.draw()
 
         pygame.display.update() # flip?
-        print("FPS: "clock.tick(60))
+        clock.tick(60)
 
     saveWorld()
 
