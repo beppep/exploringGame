@@ -4,13 +4,15 @@ import time
 import os
 import worldgen
 import math
-
+import pickle
 
 screenWidth = 1300
 screenHeight = 700
-gameDisplay = pygame.display.set_mode((screenWidth, screenHeight))
 gridSize = 64
-tiles = []
+
+if __name__ == "__main__":
+    gameDisplay = pygame.display.set_mode((screenWidth, screenHeight))
+    clock = pygame.time.Clock()
 
 def loadImage(textureName, size=gridSize):
     name = os.path.join("textures", textureName)
@@ -20,7 +22,7 @@ def loadImage(textureName, size=gridSize):
     #img_surface = image
     #image = pygame.transform.flip(image, True, False)
     return image
-
+"""
 def collides(self, other):
         r = self.__class__.radius + other.__class__.radius
         dx = self.x-other.x
@@ -29,10 +31,22 @@ def collides(self, other):
             return True
         else:
             return False
+"""
+class Camera():
+
+    def __init__(self):
+        self.x = 0
+        self.y = 0
+
+    def move(self):
+        self.x = world.player.x-screenWidth//2
+        self.y = world.player.y-screenHeight//2
+
+    def drawImage(self, image, x, y):
+        gameDisplay.blit(image, (x-self.x, y-self.y))
 
 class World():
 
-    a=0
     def __init__(self):
         self.tiles = []
         self.player=None
@@ -76,8 +90,6 @@ class World():
         return thing
 
     def getTile(self, x, y):
-        #print(world.a)
-        world.a+=1
         x = x//gridSize
         y = y//gridSize
         return self.tiles[int(y)][int(x)]
@@ -158,19 +170,6 @@ class Tile():
     def draw(self):
         world.camera.drawImage(self.images[self.type], self.x, self.y)
 
-class Camera():
-
-    def __init__(self):
-        self.x = 0
-        self.y = 0
-
-    def move(self):
-        self.x = world.player.x-screenWidth//2
-        self.y = world.player.y-screenHeight//2
-
-    def drawImage(self, image, x, y):
-        gameDisplay.blit(image, (x-self.x, y-self.y))
-
 class Thing():
     
     def __init__(self, x=0, y=0):
@@ -193,7 +192,6 @@ class Thing():
             world.things.remove(self)
 
     def draw(self, x, y):
-        #pl = world.player
 
         dx = (self.x-x)
         dy = (self.y-y)
@@ -470,7 +468,6 @@ class Player():
         self.x = x
         self.y = y
         self.size = 1
-        self.image = Player.idleImage
         self.holding = None
         self.spaceDown = False
         self.eDown = False
@@ -550,38 +547,71 @@ class Player():
                 recipe[1](things)
 
     def draw(self, x, y): #becuase world sends these
-        world.camera.drawImage(self.image, self.x-gridSize*self.size//2, self.y-gridSize*self.size)
+        world.camera.drawImage(Player.idleImage, self.x-gridSize*self.size//2, self.y-gridSize*self.size)
         if self.holding:
             self.holding.x=self.x
             self.holding.y=self.y-gridSize//4
             self.holding.draw(self.x,self.y)
 
+def saveWorld():
+    print("saving...")
+    file = open(world.fileName, "wb")
+
+    for thing in world.things:
+        thing.image= None #save picklen
+    if world.player.holding:
+        world.player.holding.image = None #pkl
+
+    pickle.dump(world, file)
+    file.close()
+def loadWorld():
+    name = "worlds/"+input("World name: ")+".broor"
+    try:
+        file = open(name, "rb") #read
+        world = pickle.load(file)
+
+        for thing in world.things:
+            thing.setSize(thing.size) #images back
+        holdd = world.player.holding
+        if holdd:
+            holdd.setSize(holdd.size)
+
+    except Exception as e:
+        file = open(name, "x") #create
+        world = None
+        print("error:",e)
+    print("worldobject:",world)
+    file.close()
+    return world, name
+
+def main():
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+        # DO THINGS
+        pressed = pygame.key.get_pressed()
+        world.update(pressed)
 
 
-world = World()
-world.generateWorld()
-world.player.holding=Hatchet(x=world.player.x,y=world.player.x)
-world.makeThing(world.player, Crystal)
-clock = pygame.time.Clock()
-running = True
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
+        # DRAW
+        gameDisplay.fill((25,25,105))
+        world.draw()
 
-    # DO THINGS
-    pressed = pygame.key.get_pressed()
-    world.update(pressed)
+        pygame.display.update() # flip?
+        print("FPS: "clock.tick(60))
 
+    saveWorld()
 
-    # DRAW
-    gameDisplay.fill((25,25,105))
-    world.draw()
+    pygame.quit()
+    quit()
 
-    pygame.display.update() # flip?
-    print(clock.tick(60))
-
-
-
-pygame.quit()
-quit()
+if __name__ == "__main__":
+    world, fileName = loadWorld()
+    if world == None:
+        world = World() #tthis needs to be global...
+        world.generateWorld() #...because this
+    world.fileName = fileName
+    main()
