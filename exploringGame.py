@@ -156,7 +156,9 @@ class Tile():
         self.x = x
         self.y = y
         self.type = typee
-        if self.type == 3 and random.random()<0.03:
+        if self.type == 2 and random.random()<0.01:
+            world.things.append(SandLizard(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
+        elif self.type == 3 and random.random()<0.03:
             world.things.append(Flower(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
         elif self.type == 3 and random.random()<0.2:
             world.things.append(Tree(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
@@ -237,7 +239,7 @@ class Hatchet(Thing):
         self.setSize(1)
     def use(self):
         print("uses:",self.uses)
-        filterer = lambda x: x.type in ["tree","stone","flower","iceflower","animus"]
+        filterer = lambda x: x.type in ["tree","stone","flower","iceflower","animus","sandlizard","lizard","gremlin"]
         thing = world.search(self, filterer)
         if thing:
             self.uses-=1
@@ -250,11 +252,13 @@ class Hatchet(Thing):
             elif(thing.type=="stone"):
                 for i in range(random.randint(1,2)):
                     world.makeThing(thing, Pebble, size=thing.size)
-                if(random.random()<0.2):
+                if(random.random()<0.3):
                     if(self.type=="mosshatchet"):
                         world.makeThing(thing, Emerald, size=thing.size)
                     else:
                         world.makeThing(thing, Ruby, size=thing.size)
+            elif(thing.type=="gremlin"):
+                world.makeThing(thing, GremlinCorpse, size=thing.size)
             if(self.uses<=0):
                 world.player.holding=None
 class MossHatchet(Hatchet):
@@ -454,9 +458,9 @@ class MossWand(Thing):
         mushrooms=random.randint(4,7)
         berries=random.randint(1,2)
         trees=random.randint(3,4)
-        for i in range(mushrooms):
+        for i in range(mushrooms): #int(self.x/gridSize)*gridSize... Ew wtf!
             thing=Mushroom(x=int(self.x/gridSize)*gridSize+random.randrange(-gridSize,2*gridSize),y=int(self.y/gridSize)*gridSize+random.randrange(-gridSize,2*gridSize))
-            thing.setSize(min(random.random()*2,0.3))
+            thing.setSize(max(random.random()*2,0.5))
             world.things.append(thing)
         for i in range(berries):
             thing=Berry(x=int(self.x/gridSize)*gridSize+random.randrange(-gridSize,2*gridSize),y=int(self.y/gridSize)*gridSize+random.randrange(-gridSize,2*gridSize))
@@ -464,23 +468,17 @@ class MossWand(Thing):
         for i in range(trees):
             thing=SwampTree(x=int(self.x/gridSize)*gridSize+random.randrange(-gridSize,2*gridSize),y=int(self.y/gridSize)*gridSize+random.randrange(-gridSize,2*gridSize))
             world.things.append(thing)
+        if 1:
+            thing=Lizard(x=int(self.x/gridSize)*gridSize+random.randrange(-gridSize,2*gridSize),y=int(self.y/gridSize)*gridSize+random.randrange(-gridSize,2*gridSize))
+            world.things.append(thing)
         self.uses-=1
         if(self.uses==0):
             world.player.holding=None
 
-          
+
 class Animal(Thing): #pass lol
-    pass
-
-class Animus(Animal):
-
     speed = gridSize//16
-
-    def __init__(self,x,y):
-        super().__init__(x,y)
-        self.type = "animus"
-        self.setSize(1)
-
+    
     def update(self):
         super().update() #pass lol
         dx=random.choice([-self.speed,0,self.speed])
@@ -488,9 +486,13 @@ class Animus(Animal):
         if world.getTile(self.x+dx, self.y+dy).type!=0: #likeit?()
             self.x+=dx
             self.y+=dy
+class Animus(Animal):
+
+    def __init__(self,x,y):
+        super().__init__(x,y)
+        self.type = "animus"
+        self.setSize(1)
 class Gremlin(Animal):
-    
-    speed = gridSize//16
 
     def __init__(self,x=0,y=0):
         super().__init__(x,y)
@@ -499,8 +501,6 @@ class Gremlin(Animal):
         self.setSize(1)
 
     def update(self):
-        super().update() #pass lol
-
         dx=random.choice([-self.speed,0,self.speed])
         dy=random.choice([-self.speed,0,self.speed])
         if world.getTile(self.x+dx, self.y+dy).type==Tile.types["snow"]:
@@ -511,11 +511,50 @@ class Gremlin(Animal):
             self.eat()
 
     def eat(self):
-        tree = world.search(self, filter=lambda x:x.type=="tree")
+        tree = world.search(self, filter=lambda x:x.type in ["tree","log","swamptree"])
         if tree:
             world.things.remove(tree)
-            world.makeThing(self, Stone, size=tree.size/2)
+            if tree.type =="log":
+                world.makeThing(self, Pebbles, size=tree.size)
+            else:
+                world.makeThing(self, Stone, size=tree.size/2)
+class GremlinCorpse(Thing):
+    def __init__(self,x=0,y=0):
+        super().__init__(x,y)
+        self.type="gremlincorpse"
 
+        self.setSize(1)
+
+    def update(self):
+        if random.random()<0.001:
+            if world.getTile(self.x, self.y).type == "snow":
+                world.things.remove(self)
+                world.makeThing(self, Gremlin, size=self.size)
+class Lizard(Animal):
+
+    def __init__(self,x,y):
+        super().__init__(x,y)
+        self.type = "lizard"
+        self.setSize(1)
+
+    def update(self):
+        dx=random.choice([-self.speed,0,self.speed])
+        dy=random.choice([-self.speed,0,self.speed])
+        if world.getTile(self.x, self.y).type<=world.getTile(self.x+dx, self.y+dy).type:
+            self.x+=dx
+            self.y+=dy
+class SandLizard(Animal):
+    def __init__(self,x,y):
+        super().__init__(x,y)
+        self.type = "sandlizard"
+        self.setSize(1)
+
+    def update(self):
+        dx=random.choice([-self.speed,0,self.speed])
+        dy=random.choice([-self.speed,0,self.speed])
+        if world.getTile(self.x+dx, self.y+dy).type==2:
+            self.x+=dx
+            self.y+=dy
 class Player():
 
     speed = gridSize//16 # //2 är för sanbbt
@@ -532,8 +571,9 @@ class Player():
         return func
 
     craftingTable = [
-    [[typeFunc("stone"), lambda x:x.type=="tree" and x.size<=1],createObject(Hatchet,tool=True)],
-    [[typeFunc("pebble"), lambda x:x.type=="tree" and x.size<=1],createObject(Shovel,tool=True)],
+    [[typeFunc("stone"), lambda x:x.type=="log" or x.type=="tree" and x.size<=1],createObject(Hatchet,tool=True)],
+    [[typeFunc("pebble"), lambda x:x.type=="log" or x.type=="tree" and x.size<=1],createObject(Shovel,tool=True)],
+    [[typeFunc("mosspebble"), lambda x:x.type=="log" or x.type=="tree" and x.size<=1],createObject(MossHatchet,tool=True)],
     [[typeFunc("log"),typeFunc("stem")],createObject(Stick)],
     [[typeFunc("sapphire")]+[typeFunc("iceflower")]*3,createObject(IceCrystal)],
     [[typeFunc("ruby")]+[typeFunc("flower")]*3,createObject(Crystal)],
@@ -577,13 +617,13 @@ class Player():
             speed*=0.5
         if ground.type==6:
             speed*=2           
-        if(pressed[pygame.K_d]):
+        if(pressed[pygame.K_d] or pressed[pygame.K_RIGHT]):
             self.x+=speed
-        if(pressed[pygame.K_a]):
+        if(pressed[pygame.K_a] or pressed[pygame.K_LEFT]):
             self.x-=speed
-        if(pressed[pygame.K_s]):
+        if(pressed[pygame.K_s] or pressed[pygame.K_DOWN]):
             self.y+=speed
-        if(pressed[pygame.K_w]):
+        if(pressed[pygame.K_w] or pressed[pygame.K_UP]):
             self.y-=speed
 
         if(not pressed[pygame.K_e]):
