@@ -607,7 +607,7 @@ class Player():
                         self.holding=None
                 elif not ground.type in [Tile.types["water"], Tile.types["snow"], Tile.types["ice"]]:
                     print("uses:",self.holding.uses)
-                    ground.type = Tiles.types["snow"]
+                    ground.type = Tile.types["snow"]
                     self.holding.uses-=1
                     if(self.holding.uses==0):
                         self.holding=None
