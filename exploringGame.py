@@ -527,7 +527,7 @@ class GremlinCorpse(Thing):
 
     def update(self):
         if random.random()<0.001:
-            if world.getTile(self.x, self.y).type == 6:
+            if world.getTile(self.x, self.y).type == 5:
                 world.things.remove(self)
                 world.makeThing(self, Gremlin, size=self.size)
 class Lizard(Animal):
