@@ -396,10 +396,26 @@ class Berry(Thing):
         super().__init__(x,y)
         self.type="berry"
         self.setSize(1)
+    def use(self):
+        animal = world.search(self, filter=lambda x:isinstance(x,Animal))
+        if(animal):
+            world.makeThing(self, animal.__class__, size=animal.size)
+            world.player.holding=None
+class Fertilizer(Thing):
+    def __init__(self,x=0,y=0):
+        super().__init__(x,y)
+        self.type="fertilizer"
+        self.setSize(1)
+    def use(self):
+        plant = world.search(self, filter=lambda x:x.type in ["flower","tree","mushroom","swamptree","iceflower"])
+        if(plant):
+            plant.setSize(plant.size*2)
+            world.player.holding=None
+
 class Mushroom(Thing):
     def __init__(self,x=0,y=0):
         super().__init__(x,y)
-        self.type="Mushroom"
+        self.type="mushroom"
         self.setSize(1)
 class Crystal(Thing):
     def __init__(self,x=0,y=0):
@@ -583,6 +599,7 @@ class Player():
     [[typeFunc("hatchet"),typeFunc("mosspebble")],createObject(MossHatchet,tool=True)],
     [[typeFunc("emerald")]+[typeFunc("wetmosspebble")]*3,createObject(MossCrystal)],
     [[typeFunc("mosscrystal")]+[typeFunc("stick")],createObject(MossWand,tool=True)],
+    [[typeFunc("mushroom"),typeFunc("flower"),typeFunc("berry")],createObject(Fertilizer)],
 
     ]
 

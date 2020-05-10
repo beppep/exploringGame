@@ -25,11 +25,12 @@ class Terrain():
     waterlevel = 50 #20 if worley
     snowlevel = 75 #40 if worely
     scheme = [[waterlevel-10,0],[waterlevel,1],[waterlevel+5,2],[waterlevel+15,3],[snowlevel,4],[101,5]]
-        
+    colors = [[8, 59, 140],[14, 85, 199],[222, 214, 122],[84, 168, 69],[26, 102, 12],[243, 247, 225]]
+
     def draw(self):
         for x in range(int(32*32/self.gridSize)):
                 for y in range(int(32*18/self.gridSize)):
-                    c = self.noiseMap[y][x]
+                    c = self.colors[self.noiseMap[y][x]]
                     pygame.draw.rect(gameDisplay,c,pygame.Rect(x*self.gridSize,y*self.gridSize,self.gridSize,self.gridSize))
     
     def generate(self):
