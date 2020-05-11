@@ -157,7 +157,7 @@ class Tile():
     types = {"water":0,"lightWater":1,"sand":2,"grass":3,"darkGrass":4,"snow":5,"ice":6,"swamp":7}
 
     #images = (lambda types=types:{types[key]:loadImage(key+".png") for key in types})() #list comprehension scope error solution. dont ask
-    images = [loadImage("tile_"+str(i)+".png") for i in range(len(types))] # new Tileset
+    images = [loadImage("tiles/tile_"+str(i)+".png") for i in range(len(types))] # new Tileset
     def __init__(self, typee, x=0, y=0):
         self.x = x
         self.y = y
@@ -191,7 +191,7 @@ class Thing():
         pass
     def setSize(self, size):
         self.size=size
-        self.image = loadImage(self.type+".png",int(self.size*gridSize))
+        self.image = loadImage("things/"+self.type+".png",int(self.size*gridSize))
 
     def drop(self):
         ground = world.getTile(self.x,self.y)
@@ -444,10 +444,8 @@ class Wand(Thing):
         ground = world.getTile(self.x,self.y)
         if ground.type == Tile.types["grass"]:
             self.uses-=1
-            for i in range(math.ceil(random.randint(1,3))):
+            for i in range(random.randint(1,3)):
                 world.makeThing(world.player, Flower)
-            for i in range(math.ceil(random.randint(0,2))):
-                world.makeThing(world.player, Tree, size=1.5)
             if self.uses<=0:
                 world.player.holding = None
 class IceCrystal(Thing):
@@ -672,7 +670,7 @@ class Player():
 
     def release(self):
         self.holding.x = self.x
-        self.holding.y = self.y
+        self.holding.y = self.y+0.1
         world.things.append(self.holding)
         self.holding.drop() #after appending!
         self.craft() #can craft something else lol
