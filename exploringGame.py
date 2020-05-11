@@ -81,9 +81,15 @@ class World():
         for thing in thingsToDraw:
             thing.draw(x,y)
     
-    def makeThing(self, creator, cls, size=None):
-        spread = gridSize//4 #spread kan vara ett argument i guess
-        thing=cls(x=creator.x+random.randrange(-spread,spread),y=creator.y+random.randrange(-spread,spread))
+    def makeThing(self, creator, cls, size=None, pos=None, spread=gridSize//4):
+        if pos==None:
+            pos = (creator.x, creator.y)
+        xr=0
+        yr=0
+        while self.getTile(xr,yr).type==0:
+            xr = pos[0]+random.randrange(-spread,spread)
+            yr = pos[1]+random.randrange(-spread,spread)
+        thing=cls(x=xr,y=yr)
         if size:
             thing.setSize(size)
         self.things.append(thing)
@@ -244,7 +250,7 @@ class Hatchet(Thing):
         if thing:
             self.uses-=1
             world.things.remove(thing)
-            if(thing.type=="tree"):
+            if(thing.type in ["tree", "swamptree"]):
                 for i in range(random.randint(1,2)):
                     world.makeThing(thing, Log, size=thing.size/2)
             elif(thing.type=="flower" or thing.type=="iceflower"):
@@ -303,7 +309,7 @@ class Tree(Thing):
             ground = world.getTile(self.x,self.y)
             if ground.type==5:
                 self.setSize(self.size-0.01)
-                if self.size<=0:
+                if self.size<=0.1:
                     world.things.remove(self)
             if ground.type==1:
                 self.setSize(self.size+0.01)
@@ -399,7 +405,7 @@ class Berry(Thing):
     def use(self):
         animal = world.search(self, filter=lambda x:isinstance(x,Animal))
         if(animal):
-            world.makeThing(self, animal.__class__, size=animal.size)
+            world.makeThing(animal, animal.__class__, size=animal.size)
             world.player.holding=None
 class Fertilizer(Thing):
     def __init__(self,x=0,y=0):
@@ -466,27 +472,27 @@ class MossWand(Thing):
         self.uses=1
         self.active=False
     def use(self):
+        x = world.player.x
+        y = world.player.y
+        if world.getTile(x, y).type==0:
+            return
         for dx in [-1,0,1]:
             for dy in [-1,0,1]:
-                ground = world.getTile(self.x+dx*gridSize,self.y+dy*gridSize)
-                if(ground.type > 1):
+                ground = world.getTile(x+dx*gridSize, y+dy*gridSize)
+                if(ground.type > 0):
                     ground.type = Tile.types["swamp"]
         mushrooms=random.randint(4,7)
         berries=random.randint(1,2)
         trees=random.randint(3,4)
-        for i in range(mushrooms): #int(self.x/gridSize)*gridSize... Ew wtf!
-            thing=Mushroom(x=int(self.x/gridSize)*gridSize+random.randrange(-gridSize,2*gridSize),y=int(self.y/gridSize)*gridSize+random.randrange(-gridSize,2*gridSize))
-            thing.setSize(max(random.random()*2,0.5))
-            world.things.append(thing)
+        pos = lambda :((x//gridSize+0.5)*gridSize, (y//gridSize+0.5)*gridSize)
+        for i in range(mushrooms):
+            world.makeThing(self, Mushroom, pos=pos(), spread=gridSize*1.5, size=(random.random()+0.5)**2)
         for i in range(berries):
-            thing=Berry(x=int(self.x/gridSize)*gridSize+random.randrange(-gridSize,2*gridSize),y=int(self.y/gridSize)*gridSize+random.randrange(-gridSize,2*gridSize))
-            world.things.append(thing)
+            world.makeThing(self, Berry, pos=pos(), spread=gridSize*1.5)
         for i in range(trees):
-            thing=SwampTree(x=int(self.x/gridSize)*gridSize+random.randrange(-gridSize,2*gridSize),y=int(self.y/gridSize)*gridSize+random.randrange(-gridSize,2*gridSize))
-            world.things.append(thing)
+            world.makeThing(self, SwampTree, pos=pos(), spread=gridSize*1.5)
         if 1:
-            thing=Lizard(x=int(self.x/gridSize)*gridSize+random.randrange(-gridSize,2*gridSize),y=int(self.y/gridSize)*gridSize+random.randrange(-gridSize,2*gridSize))
-            world.things.append(thing)
+            world.makeThing(self, Lizard)
         self.uses-=1
         if(self.uses==0):
             world.player.holding=None
@@ -677,6 +683,7 @@ class Player():
             self.holding.use()
         else:
             self.craft()
+            #self.holding = MossWand() #hacks
     def craft(self):
         #add check if holding is in recipes to reduce lag
         for recipe in self.craftingTable:
