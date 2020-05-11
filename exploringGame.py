@@ -150,8 +150,8 @@ class Tile():
 
     types = {"water":0,"lightWater":1,"sand":2,"grass":3,"darkGrass":4,"snow":5,"ice":6,"swamp":7}
 
-    images = (lambda types=types:{types[key]:loadImage(key+".png") for key in types})() #list comprehension scope error solution. dont ask
-
+    #images = (lambda types=types:{types[key]:loadImage(key+".png") for key in types})() #list comprehension scope error solution. dont ask
+    images = [loadImage("tile_"+str(i)+".png") for i in range(len(types))] # new Tileset
     def __init__(self, typee, x=0, y=0):
         self.x = x
         self.y = y
