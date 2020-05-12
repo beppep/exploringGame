@@ -183,7 +183,8 @@ class Thing():
         self.x = x
         self.y = y
         self.size =1
-
+    def isPet(self):
+        return self==world.player.pet
     def use(self):
         pass
         #self.drop() # kinda nice
@@ -245,7 +246,7 @@ class Hatchet(Thing):
         self.setSize(1)
     def use(self):
         print("uses:",self.uses)
-        filterer = lambda x: x.type in ["tree","stone","flower","iceflower","animus","sandlizard","lizard","gremlin"]
+        filterer = lambda x: x.type in ["tree","swamptree","stone","flower","iceflower","animus","sandlizard","lizard","gremlin"]
         thing = world.search(self, filterer)
         if thing:
             self.uses-=1
@@ -494,7 +495,15 @@ class MossWand(Thing):
         self.uses-=1
         if(self.uses==0):
             world.player.holding=None
-
+class Flute(Thing):
+    def __init__(self,x=0,y=0):
+        super().__init__(x,y)
+        self.type="flute"
+        self.setSize(1)
+    def use(self):
+        animal = world.search(self, filter=lambda x:x.type in ["lizard","sandlizard"])
+        if(animal):
+            world.player.pet=animal
 
 class Animal(Thing): #pass lol
     speed = gridSize//16
@@ -555,26 +564,48 @@ class Lizard(Animal):
     def __init__(self,x,y):
         super().__init__(x,y)
         self.type = "lizard"
+        self.speed=0.7*gridSize//16
         self.setSize(1)
-
+        self.holding = None
+        self.tileType=7
     def update(self):
-        dx=random.choice([-self.speed,0,self.speed])
-        dy=random.choice([-self.speed,0,self.speed])
-        if world.getTile(self.x, self.y).type<=world.getTile(self.x+dx, self.y+dy).type:
-            self.x+=dx
-            self.y+=dy
-class SandLizard(Animal):
+        if(not self.isPet()):
+            dx=random.choice([-self.speed,0,self.speed])
+            dy=random.choice([-self.speed,0,self.speed])
+            if world.getTile(self.x+dx, self.y+dy).type==self.tileType:
+                self.x+=dx
+                self.y+=dy
+        else:
+            dx,dy = 0,0
+            if(abs(world.player.x-self.x) > 0):
+                dx=self.speed*((world.player.x-self.x)/abs(world.player.x-self.x))
+            if(abs(world.player.y-self.y) > 0):
+                dy=self.speed*((world.player.y-self.y)/abs(world.player.y-self.y))
+            if(abs(world.player.x-self.x)**2+abs(world.player.y-self.y)**2>10000):
+                self.x+=dx
+                self.y+=dy
+    def draw(self, x, y):
+
+        dx = (self.x-x)
+        dy = (self.y-y)
+        wdt = 1400
+        hgt = 800
+        
+        if(2*dx<wdt and 2*dy<hgt) and (2*-dx<wdt and 2*-dy<hgt):
+            world.camera.drawImage(self.image, self.x-gridSize*self.size//2, self.y-gridSize*self.size)
+            if self.holding:
+                self.holding.x=self.x
+                self.holding.y=self.y-gridSize//4
+                self.holding.draw(self.x,self.y)
+class SandLizard(Lizard):
     def __init__(self,x,y):
         super().__init__(x,y)
         self.type = "sandlizard"
+        self.speed=0.8*gridSize//16
         self.setSize(1)
+        self.holding = None
+        self.tileType=2
 
-    def update(self):
-        dx=random.choice([-self.speed,0,self.speed])
-        dy=random.choice([-self.speed,0,self.speed])
-        if world.getTile(self.x+dx, self.y+dy).type==2:
-            self.x+=dx
-            self.y+=dy
 class Player():
 
     speed = gridSize//16 # //2 är för sanbbt
@@ -589,11 +620,11 @@ class Player():
             if(tool):
                  obj.uses=max(int(obj.size**1*obj.uses),1)
         return func
-
+    tree = lambda x:((x.type=="tree" or x.type=="swamptree") and x.size<=1)
     craftingTable = [
-    [[typeFunc("stone"), lambda x:x.type=="log" or x.type=="tree" and x.size<=1],createObject(Hatchet,tool=True)],
-    [[typeFunc("pebble"), lambda x:x.type=="log" or x.type=="tree" and x.size<=1],createObject(Shovel,tool=True)],
-    [[typeFunc("mosspebble"), lambda x:x.type=="log" or x.type=="tree" and x.size<=1],createObject(MossHatchet,tool=True)],
+    [[typeFunc("stone"), tree],createObject(Hatchet,tool=True)],
+    [[typeFunc("pebble"), tree],createObject(Shovel,tool=True)],
+    [[typeFunc("mosspebble"), tree],createObject(MossHatchet,tool=True)],
     [[typeFunc("log"),typeFunc("stem")],createObject(Stick)],
     [[typeFunc("sapphire")]+[typeFunc("iceflower")]*3,createObject(IceCrystal)],
     [[typeFunc("ruby")]+[typeFunc("flower")]*3,createObject(Crystal)],
@@ -604,6 +635,7 @@ class Player():
     [[typeFunc("emerald")]+[typeFunc("wetmosspebble")]*3,createObject(MossCrystal)],
     [[typeFunc("mosscrystal")]+[typeFunc("stick")],createObject(MossWand,tool=True)],
     [[typeFunc("mushroom"),typeFunc("flower"),typeFunc("berry")],createObject(Fertilizer)],
+    [[typeFunc("log")]+[typeFunc("mushroom")]*3,createObject(Flute)],
 
     ]
 
@@ -614,7 +646,8 @@ class Player():
         self.holding = None
         self.spaceDown = False
         self.eDown = False
-
+        self.rDown = False
+        self.pet = None
     def move(self, pressed):
         speed = self.speed
         ground = world.getTile(self.x, self.y)
@@ -653,6 +686,12 @@ class Player():
             self.eDown = True
             self.use()
 
+        if(not pressed[pygame.K_r]):
+            self.rDown = False
+        if(pressed[pygame.K_r] and not self.rDown):
+            self.rDown = True
+            self.retrieve()
+
         if(not pressed[pygame.K_SPACE]):
             self.spaceDown = False
         if(pressed[pygame.K_SPACE] and not self.spaceDown):
@@ -682,6 +721,11 @@ class Player():
         else:
             self.craft()
             #self.holding = MossWand() #hacks
+    def retrieve(self):
+        pet = world.search(self, filter=lambda x:x==self.pet)
+        if(pet):
+            self.holding, pet.holding = pet.holding, self.holding
+
     def craft(self):
         #add check if holding is in recipes to reduce lag
         for recipe in self.craftingTable:
@@ -751,8 +795,23 @@ def main():
     pygame.quit()
     quit()
 
+def fix():
+    for thing in world.things:
+        if(thing.type=="Mushroom"):
+            thing.type="mushroom"
+        if(thing.type=="lizard"):
+            world.things.remove(thing)
+            think=Lizard(x=thing.x,y=thing.y)
+            world.things.append(think)
+        if(thing.type=="sandlizard"):
+            world.things.remove(thing)
+            think=SandLizard(x=thing.x,y=thing.y)
+            world.things.append(think)
+
 if __name__ == "__main__":
     world, fileName = loadWorld()
+    #fix() #<- ignore
+    world.player.rDown=False
     if world == None:
         world = World() #tthis needs to be global...
         world.generateWorld() #...because this
