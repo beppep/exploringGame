@@ -768,7 +768,7 @@ def loadWorld():
             thing.setSize(thing.size) #images back
             holdd=thing.holding
             while holdd:
-                holdd.image= None #lizardtowers load
+                holdd.setSize(holdd.size) #lizardtowers load
                 holdd=holdd.holding
         holdd = world.player.holding
         while holdd:
