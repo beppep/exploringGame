@@ -150,7 +150,7 @@ class World():
             x=random.randint(0,32*32*gridSize/4-1)
             y=random.randint(0,18*32*gridSize/4-1)
             if world.getTile(x,y).type!=0:
-                self.things.append(Animus(x,y))
+                self.things.append(random.choice([Animus, SkySnake])(x,y))
 
 class Tile():
 
@@ -606,6 +606,12 @@ class SandLizard(Lizard):
         self.setSize(1)
         self.holding = None
         self.tileType=2
+class SkySnake(Animal):
+
+    def __init__(self,x,y):
+        super().__init__(x,y)
+        self.type = "skysnake"
+        self.setSize(1)
 
 class Player():
 
