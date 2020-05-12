@@ -32,13 +32,20 @@ def collides(self, other):
         else:
             return False
 """
+def climbTower(thing, func=lambda x:False):
+    func(thing)
+    while thing.holding:
+        thing = thing.holding
+        func(thing)
+    return thing
+
 class Camera():
 
     def __init__(self):
         self.x = 0
         self.y = 0
 
-    def move(self):
+    def update(self):
         self.x = world.player.x-screenWidth//2
         self.y = world.player.y-screenHeight//2
 
@@ -58,13 +65,13 @@ class World():
         self.generateTiles()        
         self.generateThings()
         self.player = Player()
+        self.things.append(self.player)
         self.camera = Camera()
 
-    def update(self, pressed):
-        self.player.move(pressed)
-        self.camera.move()
+    def update(self):
         for thing in self.things:
             thing.update()
+        self.camera.update()
 
     def draw(self):
         x,y = self.player.x, self.player.y
@@ -76,9 +83,8 @@ class World():
                     if col<len(self.tiles[row]):
                         self.tiles[row][col].draw()
 
-        thingsToDraw = self.things + [self.player]
-        thingsToDraw.sort(key=lambda x:x.y)
-        for thing in thingsToDraw:
+        self.things.sort(key=lambda x:x.y)
+        for thing in self.things:
             thing.draw(x,y)
     
     def makeThing(self, creator, cls, size=None, pos=None, spread=gridSize//4):
@@ -100,6 +106,11 @@ class World():
         y = y//gridSize
         return self.tiles[int(y)][int(x)]
 
+    def kill(self, obj):
+        self.things.remove(obj)
+        if obj.holding:
+            self.things.append(obj.holding)
+
     def search(self, obj,filter=lambda x:True,range=1):
         closest = None
         best = range*gridSize
@@ -120,11 +131,13 @@ class World():
                 self.things.remove(closest)
             else:
                 break
+        for obj in objects:
+            self.things.append(obj)
         if(len(objects)==len(filters)):
+            for obj in objects:
+                self.kill(obj)
             return objects
         else:
-            for obj in objects:
-                self.things.append(obj)
             return None
     def generateTiles(self):
         terrain = worldgen.Terrain()
@@ -190,7 +203,15 @@ class Thing():
         pass
         #self.drop() # kinda nice
     def update(self):
-        pass
+        if self.holding: #skysnake
+            top = climbTower(self)
+            if top.type=="skysnake":
+                dx=random.choice([-SkySnake.speed,0,SkySnake.speed])
+                dy=random.choice([-SkySnake.speed,0,SkySnake.speed])
+                if world.getTile(self.x+dx, self.y+dy).type!=0: #likeit?()
+                    self.x+=dx
+                    self.y+=dy
+
     def setSize(self, size):
         self.size=size
         self.image = loadImage("things/"+self.type+".png",int(self.size*gridSize))
@@ -209,6 +230,10 @@ class Thing():
         
         if(2*dx<wdt and 2*dy<hgt) and (2*-dx<wdt and 2*-dy<hgt):
             world.camera.drawImage(self.image, self.x-gridSize*self.size//2, self.y-gridSize*self.size)
+            if self.holding:
+                self.holding.x=self.x
+                self.holding.y=self.y-gridSize//4
+                self.holding.draw(self.x,self.y)
 
 class Flower(Thing):
     def __init__(self,x=0,y=0):
@@ -218,7 +243,7 @@ class Flower(Thing):
     def drop(self):
         super().drop()
         if(world.getTile(self.x,self.y).type==Tile.types["snow"]):
-            world.things.remove(self)
+            world.kill(self)
             world.makeThing(self, IceFlower, size=self.size)
 class IceFlower(Thing):
     def __init__(self,x=0,y=0):
@@ -228,7 +253,7 @@ class IceFlower(Thing):
     def drop(self):
         super().drop()
         if(world.getTile(self.x,self.y).type==Tile.types["lightWater"]):
-            world.things.remove(self)
+            world.kill(self)
             world.makeThing(self, Flower, size=self.size)
     def use(self):
         ground = world.getTile(self.x, self.y)
@@ -247,11 +272,11 @@ class Hatchet(Thing):
         self.setSize(1)
     def use(self):
         print("uses:",self.uses)
-        filterer = lambda x: x.type in ["tree","swamptree","stone","flower","iceflower","animus","sandlizard","lizard","gremlin"]
+        filterer = lambda x: x.type in ["tree","swamptree","stone","flower","iceflower","animus","sandlizard","lizard","gremlin","skysnake"]
         thing = world.search(self, filterer)
         if thing:
             self.uses-=1
-            world.things.remove(thing)
+            world.kill(thing)
             if(thing.type in ["tree", "swamptree"]):
                 for i in range(random.randint(1,2)):
                     world.makeThing(thing, Log, size=thing.size/2)
@@ -267,6 +292,8 @@ class Hatchet(Thing):
                         world.makeThing(thing, Ruby, size=thing.size)
             elif(thing.type=="gremlin"):
                 world.makeThing(thing, GremlinCorpse, size=thing.size)
+            elif(thing.type=="skysnake"):
+                world.makeThing(thing, Lizard, size=thing.size)
             if(self.uses<=0):
                 world.player.holding=None
 class MossHatchet(Hatchet):
@@ -312,7 +339,7 @@ class Tree(Thing):
             if ground.type==5:
                 self.setSize(self.size-0.01)
                 if self.size<=0.1:
-                    world.things.remove(self)
+                    world.kill(self)
             if ground.type==1:
                 self.setSize(self.size+0.01)
                 if random.random()<0.05:
@@ -337,7 +364,7 @@ class Ruby(Thing):
     def drop(self):
         ground = world.getTile(self.x,self.y)
         if ground.type < 2:
-            world.things.remove(self)
+            world.kill(self)
             if(random.random()<0.3):
                 world.makeThing(self, Sapphire, size=self.size)
 class Pebble(Thing):
@@ -360,7 +387,7 @@ class MossPebble(Thing):
     def drop(self):
         super().drop()
         if(world.getTile(self.x,self.y).type==Tile.types["lightWater"]):
-            world.things.remove(self)
+            world.kill(self)
             world.makeThing(self, WetMossPebble, size=self.size)
 class WetMossPebble(Thing):
     def __init__(self,x=0,y=0):
@@ -417,7 +444,7 @@ class Fertilizer(Thing):
     def use(self):
         plant = world.search(self, filter=lambda x:x.type in ["flower","tree","mushroom","swamptree","iceflower"])
         if(plant):
-            plant.setSize(plant.size*2)
+            plant.setSize(plant.size+1)
             world.player.holding=None
 
 class Mushroom(Thing):
@@ -543,7 +570,7 @@ class Gremlin(Animal):
     def eat(self):
         tree = world.search(self, filter=lambda x:x.type in ["tree","log","swamptree"])
         if tree:
-            world.things.remove(tree)
+            world.kill(tree)
             if tree.type =="log":
                 world.makeThing(self, Pebbles, size=tree.size)
             else:
@@ -558,7 +585,7 @@ class GremlinCorpse(Thing):
     def update(self):
         if random.random()<0.001:
             if world.getTile(self.x, self.y).type == 5:
-                world.things.remove(self)
+                world.kill(self)
                 world.makeThing(self, Gremlin, size=self.size)
 class Lizard(Animal):
 
@@ -585,19 +612,6 @@ class Lizard(Animal):
             if(abs(world.player.x-self.x)**2+abs(world.player.y-self.y)**2>10000):
                 self.x+=dx
                 self.y+=dy
-    def draw(self, x, y):
-
-        dx = (self.x-x)
-        dy = (self.y-y)
-        wdt = 1400
-        hgt = 800
-        
-        if(2*dx<wdt and 2*dy<hgt) and (2*-dx<wdt and 2*-dy<hgt):
-            world.camera.drawImage(self.image, self.x-gridSize*self.size//2, self.y-gridSize*self.size)
-            if self.holding:
-                self.holding.x=self.x
-                self.holding.y=self.y-gridSize//4
-                self.holding.draw(self.x,self.y)
 class SandLizard(Lizard):
     def __init__(self,x,y):
         super().__init__(x,y)
@@ -613,7 +627,7 @@ class SkySnake(Animal):
         self.type = "skysnake"
         self.setSize(1)
 
-class Player():
+class Player(Thing):
 
     speed = gridSize//16 # //2 är för sanbbt
 
@@ -627,7 +641,7 @@ class Player():
             if(tool):
                  obj.uses=max(int(obj.size**1*obj.uses),1)
         return func
-    tree = lambda x:((x.type=="tree" or x.type=="swamptree") and x.size<=1)
+    tree = lambda x:(x.type=="log" or (x.type=="tree" or x.type=="swamptree") and x.size<=1)
     craftingTable = [
     [[typeFunc("stone"), tree],createObject(Hatchet,tool=True)],
     [[typeFunc("pebble"), tree],createObject(Shovel,tool=True)],
@@ -655,9 +669,13 @@ class Player():
         self.eDown = False
         self.rDown = False
         self.pet = None
-    def move(self, pressed):
-        speed = self.speed
+        self.type = "player"
+        self.image = Player.idleImage
+    def update(self):
         ground = world.getTile(self.x, self.y)
+        pressed = pygame.key.get_pressed()
+
+        #icewand
         if(self.holding and self.holding.type=="icewand"):
             if(self.holding.active):
                 if ground.type=="lightWater":
@@ -672,20 +690,19 @@ class Player():
                     self.holding.uses-=1
                     if(self.holding.uses==0):
                         self.holding=None
-        if ground.type==0:
-            speed*=0.25
-        if ground.type==1:
-            speed*=0.5
-        if ground.type==6:
-            speed*=2           
-        if(pressed[pygame.K_d] or pressed[pygame.K_RIGHT]):
-            self.x+=speed
-        if(pressed[pygame.K_a] or pressed[pygame.K_LEFT]):
-            self.x-=speed
-        if(pressed[pygame.K_s] or pressed[pygame.K_DOWN]):
-            self.y+=speed
-        if(pressed[pygame.K_w] or pressed[pygame.K_UP]):
-            self.y-=speed
+
+        if self.holding:
+            top = climbTower(self.holding)
+            if top and top.type=="skysnake":
+                dx=random.choice([-SkySnake.speed,0,SkySnake.speed])
+                dy=random.choice([-SkySnake.speed,0,SkySnake.speed])
+                if world.getTile(self.x+dx, self.y+dy).type!=0:
+                    self.x+=dx
+                    self.y+=dy
+            else:
+                self.move(pressed, ground)
+        else:
+            self.move(pressed, ground)
 
         if(not pressed[pygame.K_e]):
             self.eDown = False
@@ -708,6 +725,23 @@ class Player():
             else:
                 self.release()
 
+    def move(self, pressed, ground):
+        speed = self.speed
+        if ground.type==0:
+            speed*=0.25
+        if ground.type==1:
+            speed*=0.5
+        if ground.type==6:
+            speed*=2           
+        if(pressed[pygame.K_d] or pressed[pygame.K_RIGHT]):
+            self.x+=speed
+        if(pressed[pygame.K_a] or pressed[pygame.K_LEFT]):
+            self.x-=speed
+        if(pressed[pygame.K_s] or pressed[pygame.K_DOWN]):
+            self.y+=speed
+        if(pressed[pygame.K_w] or pressed[pygame.K_UP]):
+            self.y-=speed
+
     def grab(self):
         thing = world.search(self, range=1)
         if thing:
@@ -726,8 +760,8 @@ class Player():
         if(self.holding):
             self.holding.use()
         else:
-            self.craft()
-            #self.holding = MossWand() #hacks
+            #self.craft()
+            self.holding = Flute() #hacks
     def retrieve(self):
         pet = world.search(self, filter=lambda x:x==self.pet)
         if(pet):
@@ -741,7 +775,7 @@ class Player():
                 recipe[1](things)
 
     def draw(self, x, y): #becuase world sends these
-        world.camera.drawImage(Player.idleImage, self.x-gridSize*self.size//2, self.y-gridSize*self.size)
+        world.camera.drawImage(self.image, self.x-gridSize*self.size//2, self.y-gridSize*self.size)
         if self.holding:
             self.holding.x=self.x
             self.holding.y=self.y-gridSize//4
@@ -751,16 +785,11 @@ def saveWorld():
     print("saving...")
     file = open(world.fileName, "wb")
 
+    def removeImage(thing):
+        thing.image=None
+
     for thing in world.things:
-        thing.image= None #save picklen
-        holdd=thing.holding
-        while holdd:
-            holdd.image= None #save pikl from lizardtowers
-            holdd=holdd.holding
-    holdd = world.player.holding
-    while holdd:
-        holdd.image= None #save pikl from lizardtowers
-        holdd=holdd.holding
+        climbTower(thing, removeImage)
 
     pickle.dump(world, file)
     file.close()
@@ -770,16 +799,13 @@ def loadWorld():
         file = open(name, "rb") #read
         world = pickle.load(file)
 
+        def reloadImage(thing):
+            thing.setSize(thing.size)
+
         for thing in world.things:
-            thing.setSize(thing.size) #images back
-            holdd=thing.holding
-            while holdd:
-                holdd.setSize(holdd.size) #lizardtowers load
-                holdd=holdd.holding
-        holdd = world.player.holding
-        while holdd:
-            holdd.setSize(holdd.size) #lizardtowers back
-            holdd=holdd.holding
+            climbTower(thing, reloadImage)
+        if player.holding:
+            climbTower(player.holding, reloadImage)
 
     except Exception as e:
         file = open(name, "x") #create
@@ -797,8 +823,7 @@ def main():
                 running = False
 
         # DO THINGS
-        pressed = pygame.key.get_pressed()
-        world.update(pressed)
+        world.update()
 
 
         # DRAW
