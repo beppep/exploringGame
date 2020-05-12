@@ -183,6 +183,7 @@ class Thing():
         self.x = x
         self.y = y
         self.size =1
+        self.holding=None
     def isPet(self):
         return self==world.player.pet
     def use(self):
@@ -746,8 +747,14 @@ def saveWorld():
 
     for thing in world.things:
         thing.image= None #save picklen
-    if world.player.holding:
-        world.player.holding.image = None #pkl
+        holdd=thing.holding
+        while holdd:
+            holdd.image= None #save pikl from lizardtowers
+            holdd=holdd.holding
+    holdd = world.player.holding
+    while holdd:
+        holdd.image= None #save pikl from lizardtowers
+        holdd=holdd.holding
 
     pickle.dump(world, file)
     file.close()
@@ -759,9 +766,14 @@ def loadWorld():
 
         for thing in world.things:
             thing.setSize(thing.size) #images back
+            holdd=thing.holding
+            while holdd:
+                holdd.image= None #lizardtowers load
+                holdd=holdd.holding
         holdd = world.player.holding
-        if holdd:
-            holdd.setSize(holdd.size)
+        while holdd:
+            holdd.setSize(holdd.size) #lizardtowers back
+            holdd=holdd.holding
 
     except Exception as e:
         file = open(name, "x") #create
@@ -806,12 +818,12 @@ def fix():
         if(thing.type=="sandlizard"):
             world.things.remove(thing)
             think=SandLizard(x=thing.x,y=thing.y)
-            world.things.append(think)
+            world.things.append(think)#save those saves
 
 if __name__ == "__main__":
     world, fileName = loadWorld()
     #fix() #<- ignore
-    world.player.rDown=False
+    #world.player.rDown=False <- crashes new worlds
     if world == None:
         world = World() #tthis needs to be global...
         world.generateWorld() #...because this
