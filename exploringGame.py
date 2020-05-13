@@ -160,10 +160,13 @@ class World():
 
     def generateThings(self):
         for i in range(100):
-            x=random.randint(0,32*32*gridSize/4-1)
-            y=random.randint(0,18*32*gridSize/4-1)
+            x=random.randint(0,32*32*gridSize//4-1)
+            y=random.randint(0,18*32*gridSize//4-1)
             if world.getTile(x,y).type!=0:
-                self.things.append(random.choice([Animus, SkySnake])(x,y))
+                if random.random()<0.8:
+                    self.things.append(random.choice([Animus, SkySnake])(x,y))
+                else:
+                    self.things.append(random.choice([RockGolem, Hjuldjur])(x,y))
 
 class Tile():
 
@@ -179,6 +182,8 @@ class Tile():
             world.things.append(SandLizard(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
         elif self.type == 3 and random.random()<0.03:
             world.things.append(Flower(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
+        elif self.type == 3 and random.random()<0.01:
+            world.things.append(HjuldjurPlant(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
         elif self.type == 3 and random.random()<0.2:
             world.things.append(Tree(self.x+(random.random())*gridSize, self.y+(random.random())*gridSize))
         elif self.type == 4 and random.random()<0.5:
@@ -272,7 +277,7 @@ class Hatchet(Thing):
         self.setSize(1)
     def use(self):
         print("uses:",self.uses)
-        filterer = lambda x: x.type in ["tree","swamptree","stone","flower","iceflower","animus","sandlizard","lizard","gremlin","skysnake"]
+        filterer = lambda x: x.type in ["tree","swamptree","stone","flower","iceflower","animus","sandlizard","lizard","gremlin","skysnake","hjuldjurplant","hjuldjur"]
         thing = world.search(self, filterer)
         if thing:
             self.uses-=1
@@ -294,6 +299,9 @@ class Hatchet(Thing):
                 world.makeThing(thing, GremlinCorpse, size=thing.size)
             elif(thing.type=="skysnake"):
                 world.makeThing(thing, Lizard, size=thing.size)
+            elif(thing.type=="hjuldjurplant"):
+                world.makeThing(thing, Hjuldjur, size=thing.size)
+                world.makeThing(thing, Stem, size=thing.size)
             if(self.uses<=0):
                 world.player.holding=None
 class MossHatchet(Hatchet):
@@ -587,6 +595,12 @@ class GremlinCorpse(Thing):
             if world.getTile(self.x, self.y).type == 5:
                 world.kill(self)
                 world.makeThing(self, Gremlin, size=self.size)
+class RockGolem(Thing):
+
+    def __init__(self,x=0,y=0):
+        super().__init__(x,y)
+        self.type="rockgolem"
+        self.setSize(2)
 class Lizard(Animal):
 
     def __init__(self,x,y):
@@ -626,12 +640,22 @@ class SkySnake(Animal):
         super().__init__(x,y)
         self.type = "skysnake"
         self.setSize(1)
+class Hjuldjur(Animal):
+    def __init__(self,x,y):
+        super().__init__(x,y)
+        self.type = "hjuldjur"
+        self.setSize(1)
+class HjuldjurPlant(Thing):
+    def __init__(self,x,y):
+        super().__init__(x,y)
+        self.type = "hjuldjurplant"
+        self.setSize(1)
 
 class Player(Thing):
 
     speed = gridSize//16 # //2 är för sanbbt
 
-    idleImage = loadImage("idle.png")
+    idleImage = loadImage("things/player.png")
     def typeFunc(type):
 
         return lambda x:x.type==type
@@ -804,7 +828,7 @@ def loadWorld():
 
         for thing in world.things:
             climbTower(thing, reloadImage)
-        if player.holding:
+        if world.player.holding:
             climbTower(player.holding, reloadImage)
 
     except Exception as e:
