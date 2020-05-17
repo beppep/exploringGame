@@ -110,6 +110,7 @@ class World():
         self.things.remove(obj)
         if obj.holding:
             self.things.append(obj.holding)
+            obj.holding.drop()
 
     def search(self, obj,filter=lambda x:True,range=1):
         closest = None
@@ -455,7 +456,7 @@ class MushroomFurnace(Thing):
         self.setSize(1)      
     smeltingTable={"stone":StoneBlock,"flesh":Pelt}
     def use(self):
-        thing = world.search(self, filter=lambda x:x.type in self.smeltingTable.keys())
+        thing = world.search(self, filter=lambda x:x.type in self.smeltingTable)
         if(thing and self.fuel>0):
             world.kill(thing)
             world.makeThing(thing, self.smeltingTable[thing.type], size=thing.size)
@@ -530,7 +531,7 @@ class MossWand(Thing):
         trees=random.randint(3,4)
         pos = lambda :((x//gridSize+0.5)*gridSize, (y//gridSize+0.5)*gridSize)
         for i in range(mushrooms):
-            world.makeThing(self, Mushroom, pos=pos(), spread=gridSize*1.5, size=(random.random()+0.5)**2)
+            world.makeThing(self, Mushroom, pos=pos(), spread=gridSize*1.5, size=(random.random()*0.7+0.7)**2)
         for i in range(berries):
             world.makeThing(self, Berry, pos=pos(), spread=gridSize*1.5)
         for i in range(trees):
@@ -637,14 +638,14 @@ class RubyBoots(Boots):
         super().__init__(x,y)
         self.type="rubyboots"
         self.setSize(1)
-    def speedModifier(self,speed,ground,pressed):
+    def speedModifier(self,speed,ground):
         return speed*1.5
 class EmeraldBoots(Boots):
     def __init__(self,x=0,y=0):
         super().__init__(x,y)
         self.type="emeraldboots"
         self.setSize(1)
-    def speedModifier(self,speed,ground,pressed):
+    def speedModifier(self,speed,ground):
         if(ground.type in [3,4,7]):
             return speed*1.65
         return speed*1.3
@@ -653,7 +654,7 @@ class SapphireBoots(Boots):
         super().__init__(x,y)
         self.type="sapphireboots"
         self.setSize(1)
-    def speedModifier(self,speed,ground,pressed):
+    def speedModifier(self,speed,ground):
         if(ground.type in [5,6]):
             return speed*1.7
         return speed*1.3
@@ -893,12 +894,12 @@ class Player(Thing):
     def move(self, pressed, ground):
         speed = self.speed
         if(self.feet):
-            speed=self.feet.speedModifier(speed,ground,pressed)
+            speed=self.feet.speedModifier(speed,ground)
         if ground.type==0:
             speed*=0.25
-        if ground.type==1:
+        elif ground.type==1:
             speed*=0.5
-        if ground.type==6:
+        elif ground.type==6:
             speed*=2           
         if(pressed[pygame.K_d] or pressed[pygame.K_RIGHT]):
             self.x+=speed
@@ -941,7 +942,7 @@ class Player(Thing):
     def craft(self):
         #add check if holding is in recipes to reduce lag
         for recipe in self.craftingTable:
-            things = world.searchMany(world.player,filters=recipe[0],range=1)
+            things = world.searchMany(self,filters=recipe[0],range=1)
             if(things):
                 recipe[1](things)
 
@@ -979,8 +980,6 @@ def loadWorld():
 
         for thing in world.things:
             climbTower(thing, reloadImage)
-        if world.player.holding:
-            climbTower(player.holding, reloadImage)
 
     except Exception as e:
         file = open(name, "x") #create
