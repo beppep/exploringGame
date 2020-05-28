@@ -171,7 +171,7 @@ class World():
 
 class Tile():
 
-    types = {"water":0,"lightWater":1,"sand":2,"grass":3,"darkGrass":4,"snow":5,"ice":6,"swamp":7}
+    types = {"water":0,"lightWater":1,"sand":2,"grass":3,"darkGrass":4,"snow":5,"ice":6,"swamp":7,"stone":8}
 
     #images = (lambda types=types:{types[key]:loadImage(key+".png") for key in types})() #list comprehension scope error solution. dont ask
     images = [loadImage("tiles/tile_"+str(i)+".png") for i in range(len(types))] # new Tileset
@@ -251,7 +251,12 @@ class StoneBlock(Thing):
     def __init__(self,x=0,y=0):
         super().__init__(x,y)
         self.type="stoneblock"
-        self.setSize(1)       
+        self.setSize(1)
+    def use(self):
+        ground = world.getTile(self.x,self.y)
+        if ground.type>1:
+            ground.type = Tile.types["stone"]
+            world.player.holding = None
 class Pebble(Thing):
     def __init__(self,x=0,y=0):
         super().__init__(x,y)
@@ -263,6 +268,11 @@ class Pebble(Thing):
         if ground.type == Tile.types["grass"]:
             ground.type = Tile.types["darkGrass"]
             world.player.holding = None
+    def drop(self):
+        super().drop()
+        if(world.getTile(self.x,self.y).type==Tile.types["lightWater"]):
+            world.kill(self)
+            world.makeThing(self, WetPebble, size=self.size)
 class Coal(Thing):
     def __init__(self,x=0,y=0):
         super().__init__(x,y)
@@ -279,6 +289,11 @@ class MossPebble(Thing):
         if(world.getTile(self.x,self.y).type==Tile.types["lightWater"]):
             world.kill(self)
             world.makeThing(self, WetMossPebble, size=self.size)
+class WetPebble(Thing):
+    def __init__(self,x=0,y=0):
+        super().__init__(x,y)
+        self.type="wetpebble"
+        self.setSize(1)
 class WetMossPebble(Thing):
     def __init__(self,x=0,y=0):
         super().__init__(x,y)
@@ -801,16 +816,19 @@ class Player(Thing):
                     obj.uses=max(int(obj.size**1*obj.uses),1)
         return func
     tree = lambda x:(x.type=="log" or (x.type=="tree" or x.type=="swamptree") and x.size<=1)
+    gem = lambda x:(x.type in ["ruby","sapphire","emerald"])
     craftingTable = [
     [[typeFunc("stone"), tree],createObject(Hatchet,tool=True)],
     [[typeFunc("pebble"), tree],createObject(Shovel,tool=True)],
     [[typeFunc("mosspebble"), tree],createObject(MossHatchet,tool=True)],
+    [[typeFunc("wetmosspebble"), tree],createObject(MossHatchet,tool=True)],
     [[typeFunc("log"),typeFunc("stem")],createObject(Stick)],
     [[typeFunc("sapphire")]+[typeFunc("iceflower")]*3,createObject(IceCrystal)],
     [[typeFunc("ruby")]+[typeFunc("flower")]*3,createObject(Crystal)],
     [[typeFunc("icecrystal")]+[typeFunc("stick")],createObject(IceWand,tool=True)],
     [[typeFunc("crystal")]+[typeFunc("stick")],createObject(Wand,tool=True)],
     [[typeFunc("pebble"),typeFunc("stem")],createObject(MossPebble)],
+    [[typeFunc("wetpebble"),typeFunc("stem")],createObject(WetMossPebble)],
     [[typeFunc("hatchet"),typeFunc("mosspebble")],createObject(MossHatchet,tool=True)],
     [[typeFunc("emerald")]+[typeFunc("wetmosspebble")]*3,createObject(MossCrystal)],
     [[typeFunc("mosscrystal")]+[typeFunc("stick")],createObject(MossWand,tool=True)],
@@ -823,6 +841,8 @@ class Player(Thing):
     [[typeFunc("boots")]+[typeFunc("ruby")],createObject(RubyBoots)],
     [[typeFunc("boots")]+[typeFunc("emerald")],createObject(EmeraldBoots)],
     [[typeFunc("boots")]+[typeFunc("sapphire")],createObject(SapphireBoots)],
+    [[typeFunc("pelt")]+[gem]*3,createObject(GremlinCorpse)],
+    [[typeFunc("pebble")]*5,createObject(RockGolem)], #nåt mer kanske (typ ett lik eller magi)
     ]
 
     def __init__(self, x=16*32//worldgen.Terrain.gridSize*gridSize, y=16*18//worldgen.Terrain.gridSize*gridSize):
@@ -900,7 +920,9 @@ class Player(Thing):
         elif ground.type==1:
             speed*=0.5
         elif ground.type==6:
-            speed*=2           
+            speed*=2
+        elif ground.type==8:
+            speed*=1.5 #or lower. maybe 1
         if(pressed[pygame.K_d] or pressed[pygame.K_RIGHT]):
             self.x+=speed
         if(pressed[pygame.K_a] or pressed[pygame.K_LEFT]):
@@ -1030,10 +1052,10 @@ def cheat(classes):
 
 if __name__ == "__main__":
     world, fileName = loadWorld()
-    #fix() #<- ignore
-    #cheat([MushroomFurnace]+[Fuel])
     if world == None:
         world = World() #tthis needs to be global...
         world.generateWorld() #...because this
     world.fileName = fileName
+    #fix() #<- ignore
+    #cheat([StoneBlock])
     main()
