@@ -165,7 +165,7 @@ class World():
             y=random.randint(0,18*32*gridSize//4-1)
             if world.getTile(x,y).type!=0:
                 if random.random()<0.8:
-                    self.things.append(random.choice([Animus, SkySnake])(x,y))
+                    self.things.append(random.choice([Animus, SkySnake, Moose])(x,y))
                 else:
                     self.things.append(random.choice([RockGolem, Hjuldjur])(x,y))
 
@@ -564,7 +564,7 @@ class Hatchet(Thing):
         self.setSize(1)
     def use(self):
         print("uses:",self.uses)
-        filterer = lambda x: ((x.type in ["tree","swamptree","stone","stoneblock","flower","iceflower","mushroom","animus","sandlizard","lizard","gremlin","skysnake","hjuldjurplant","hjuldjur"]) and (x.isPet()==False))
+        filterer = lambda x: ((x.type in ["tree","swamptree","stone","stoneblock","flower","iceflower","mushroom","animus","sandlizard","lizard","gremlin","skysnake","hjuldjurplant","hjuldjur","moose"]) and (x.isPet()==False))
         thing = world.search(self, filterer)
         if thing:
             self.uses-=1
@@ -611,6 +611,9 @@ class Hatchet(Thing):
             elif(thing.type=="hjuldjurplant"):
                 world.makeThing(thing, Hjuldjur, size=thing.size)
                 world.makeThing(thing, Stem, size=thing.size)
+            elif(thing.type=="moose"):
+                for i in range(random.randint(1,3)):
+                    world.makeThing(thing, Coal, size=thing.size)
             if(self.uses<=0):
                 world.player.holding=None
 class MossHatchet(Hatchet):
@@ -734,6 +737,11 @@ class RockGolem(Thing):
         super().__init__(x,y)
         self.type="rockgolem"
         self.setSize(2)
+class Moose(Animal):
+    def __init__(self,x,y):
+        super().__init__(x,y)
+        self.type = "moose"
+        self.setSize(1)
 class Lizard(Animal):
 
     def __init__(self,x,y):
